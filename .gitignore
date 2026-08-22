@@ -1,0 +1,25 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.db
+backend/server.log
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/frontend.log
+
+# Env
+.env
+backend/.env
+frontend/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Crash logs / lock files
+hs_err_pid*.log
+~$*

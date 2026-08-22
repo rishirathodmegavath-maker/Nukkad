@@ -1,0 +1,62 @@
+CLARITY — 3-MINUTE VIDEO NARRATION SCRIPT
+(Read-aloud version — timestamps are pacing guides, not hard cuts)
+
+[0:00–0:20]
+This dashboard says revenue in APAC just fell 21%. Here's the question every
+business leader asks next — why — and here's how long it usually takes an
+analyst to answer it: hours, sometimes days. We built something that answers
+it in three seconds. This is Clarity.
+
+[0:20–0:45]
+A dashboard can show you a number moved. It can't tell you why, what's
+driving it, or what to do next — that translation still falls to an analyst,
+manually cross-referencing charts, segment breakdowns, and support tickets.
+Meaningful anomalies get investigated. Everything else waits. That's the gap
+Clarity closes.
+
+[0:45–1:10]
+Clarity watches every KPI, runs statistical anomaly detection to separate
+real signal from noise, and the moment something's worth explaining, it's
+one click away. Five metrics, five different stories — a critical anomaly, a
+slow-burn risk trend, a metric that already recovered, and one the system is
+honest enough to call ambiguous. Let's open the critical one.
+
+[1:10–2:20]
+Here's the raw signal — revenue held steady around $420K a day, then dropped
+hard about ten days ago. The system already flagged it — that's the circled
+point, caught by a rolling anomaly detector, not a hardcoded alert. Now
+watch what happens when I ask it to explain.
+
+It's not calling an LLM and hoping for the best — it's running a real
+pipeline: statistics decide what's real, rules attribute the cause, and only
+at the very end does it write the explanation in plain English.
+
+There's the answer: Enterprise channel, down 79%, explains 150% of the total
+change — other channels partly offset it. It's backed by a real piece of
+evidence: a CRM note about a canceled enterprise renewal. 98% confidence,
+and it tells you exactly why it's confident. And it doesn't just diagnose —
+it recommends: escalate to the account owner within 24 hours.
+
+And here's the honest case. Churn ticked up slightly — but no single segment
+explains it. Instead of guessing, Clarity says so directly, drops its
+confidence to 21%, and recommends a human deep-dive instead of a false
+diagnosis. That restraint is the point.
+
+[2:20–2:45]
+Every one of these analyses is logged — what was asked, what was concluded,
+how confident the system was, whether the explanation came from an LLM or
+our offline fallback template. Nothing here is a black box. That's
+deliberate: this isn't one model doing everything — it's statistics and
+rules making the decisions, and an LLM used only to phrase them, with a
+deterministic fallback so the system is never dependent on an external API
+to function.
+
+[2:45–3:00]
+A days-long investigation, down to seconds — for every metric, not just the
+ones that get attention, with an audit trail and an honest confidence score
+attached to every answer. This is Clarity: AI reinvention made real, for the
+analyst work that never had enough hours in the day.
+
+--- END ---
+Total spoken word count: ~430 words (comfortably fits 3 minutes at a normal
+speaking pace of ~140-150 wpm).
