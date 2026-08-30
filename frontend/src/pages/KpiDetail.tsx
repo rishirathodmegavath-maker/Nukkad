@@ -51,6 +51,10 @@ function ContractViewer({ kpiId, role }: { kpiId: string; role: string }) {
             </div>
           </div>
           <div>
+            <dt className="text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Owner</dt>
+            <dd className="text-[var(--text-secondary)]">{contract.owner}</dd>
+          </div>
+          <div>
             <dt className="text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Drivers ({contract.dimension_label})</dt>
             <dd className="text-[var(--text-secondary)]">{contract.drivers.join(', ')}</dd>
           </div>

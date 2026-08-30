@@ -83,6 +83,7 @@ def _make_kpi(
     calculation: str,
     lineage: str,
     access_roles: list[str],
+    owner: str,
     known_drivers: list[str] | None = None,
 ) -> KPIDetail:
     dates = _dates(len(series))
@@ -124,6 +125,7 @@ def _make_kpi(
         calculation=calculation,
         lineage=lineage,
         access_roles=access_roles,
+        owner=owner,
         known_drivers=known_drivers or [],
     )
 
@@ -151,6 +153,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="SUM(invoice_amount) WHERE region='APAC', reconciled daily against Salesforce opportunity close events.",
         lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, joined to Salesforce account/channel dims.",
         access_roles=["global_exec", "apac_manager", "analyst"],
+        owner="APAC Regional Manager",
         known_drivers=["Single dominant driver: Enterprise segment account churn (TitanCorp cancellation)"],
     )
 
@@ -174,6 +177,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="COUNT(DISTINCT order_id) WHERE market='NA' AND channel='online', streamed and rolled up to daily grain.",
         lineage="OMS Kafka topic -> stream aggregator -> orders_daily materialized view.",
         access_roles=["global_exec", "na_manager", "analyst"],
+        owner="NA Regional Manager",
     )
 
     # 3. WATCH: slow gradual decline across the whole window, broad-based.
@@ -198,6 +202,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="COUNT(sessions with completed order) / COUNT(sessions) WHERE region='EMEA', aggregated hourly then rolled to daily.",
         lineage="Amplitude events + nginx access logs -> hourly Spark job -> conversion_hourly -> daily rollup.",
         access_roles=["global_exec", "emea_manager", "analyst"],
+        owner="EMEA Regional Manager",
         known_drivers=[
             "Checkout latency regression (+600ms) affecting all traffic sources equally",
             "Broad-based decline across channels — no single traffic-source outlier",
@@ -224,6 +229,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="SUM(invoice_amount) WHERE region='LATAM', reconciled daily against PagerDuty incident windows.",
         lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, annotated with PagerDuty incident overlays.",
         access_roles=["global_exec", "latam_manager", "analyst"],
+        owner="LATAM Regional Manager",
         known_drivers=["Payment gateway outage (13 days) — resolved, recovery attributable to the fix"],
     )
 
@@ -245,6 +251,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="COUNT(cancelled accounts) / COUNT(active accounts at period start), grouped by tenure cohort.",
         lineage="Salesforce account status + Zendesk cancellation surveys -> weekly batch join -> churn_weekly.",
         access_roles=["global_exec", "analyst"],
+        owner="Head of Retention (Global SMB)",
     )
 
     # 6. SPARSE-HISTORY: newly launched feature, only 12 days of data — not
@@ -268,6 +275,7 @@ def _generate_all() -> dict[str, KPIDetail]:
         calculation="COUNT(users with >=1 copilot action in 7d) / COUNT(users exposed to copilot), grouped daily.",
         lineage="Amplitude event stream -> nightly ETL -> activation_daily table (feature launched 12 days ago).",
         access_roles=["global_exec", "product_lead", "analyst"],
+        owner="Product Lead — AI Copilot",
         known_drivers=[
             "Only 12 days of history available — no reliable trend baseline yet",
             "GA rollout still ramping in batches, not yet at steady state",

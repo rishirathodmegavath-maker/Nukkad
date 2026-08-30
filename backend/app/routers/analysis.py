@@ -5,15 +5,16 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..analysis.actions import recommend_actions
+from ..analysis.actions import check_decision_authority, recommend_actions
 from ..analysis.confidence import score_confidence
+from ..analysis.materiality import score_materiality
 from ..analysis.narrative import generate_narrative
 from ..analysis.root_cause import find_primary_driver
 from ..analysis.stats_engine import classify_significance
 from ..data_generator import KPI_STORE
 from ..database import get_db
 from ..models import AuditLog
-from ..schemas import AnalysisResult, Persona, ProcessingStep, Telemetry
+from ..schemas import AnalysisResult, DecisionAuthority, Materiality, Persona, ProcessingStep, Telemetry
 
 router = APIRouter(prefix="/api/kpis", tags=["analysis"])
 
@@ -57,6 +58,24 @@ def analyze_kpi(kpi_id: str, persona: Persona = "executive", role: str = "global
         dimension=kpi.dimension_label,
         driver_segment=primary_driver.segment if primary_driver else None,
     )
+
+    mat_score, mat_stat, mat_impact, mat_estimate, mat_reasoning = score_materiality(
+        significance=significance,
+        pct_change=pct_change,
+        current_value=kpi.current_value,
+        prior_value=kpi.prior_value,
+        unit=kpi.unit,
+    )
+    materiality = Materiality(
+        score=mat_score,
+        statistical_component=mat_stat,
+        business_impact_component=mat_impact,
+        estimated_impact=mat_estimate,
+        reasoning=mat_reasoning,
+    )
+
+    can_authorize, authority_note = check_decision_authority(role=role, owner=kpi.owner, access_roles=kpi.access_roles)
+    decision_authority = DecisionAuthority(role=role, owner=kpi.owner, can_authorize=can_authorize, note=authority_note)
 
     narrative, narrative_source, llm_telemetry = generate_narrative(
         kpi=kpi,
@@ -142,6 +161,8 @@ def analyze_kpi(kpi_id: str, persona: Persona = "executive", role: str = "global
         confidence_reasoning=confidence_reasoning,
         is_ambiguous=is_ambiguous,
         recommended_actions=recommended_actions,
+        materiality=materiality,
+        decision_authority=decision_authority,
         narrative=narrative,
         narrative_source=narrative_source,
         processing_steps=processing_steps,

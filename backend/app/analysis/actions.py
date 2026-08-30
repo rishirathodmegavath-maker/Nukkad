@@ -38,3 +38,23 @@ def recommend_actions(status: str, is_ambiguous: bool, dimension: str, driver_se
         "No action required — metric is within normal operating range.",
         "Continue routine monitoring.",
     ]
+
+
+def check_decision_authority(role: str, owner: str, access_roles: list[str]) -> tuple[bool, str]:
+    """Decision rights: does the viewing role actually own this KPI's domain
+    and can therefore authorize the recommended actions, or are they
+    read/diagnostic-only and must escalate to the owner instead?
+
+    global_exec always has authority (cross-domain executive). "analyst" is
+    always advisory-only, regardless of which KPIs they can read — broad
+    visibility is not the same as authority to act. Any other role is treated
+    as the domain owner only if it's in this KPI's access_roles (i.e. it was
+    specifically entitled to this KPI's domain).
+    """
+    if role == "global_exec":
+        return True, f"Global Executive has cross-domain authority to act. Nominal owner: {owner}."
+    if role == "analyst":
+        return False, f"Analysts have diagnostic access only — recommend and escalate to the owner ({owner})."
+    if role in access_roles:
+        return True, f"'{role}' owns this KPI's domain and can authorize these actions directly."
+    return False, f"'{role}' is not the owner of this KPI — escalate to {owner} before acting."

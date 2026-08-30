@@ -60,5 +60,6 @@ def get_kpi_contract(kpi_id: str, role: str = "global_exec"):
         refresh_cadence=kpi.refresh_cadence,
         lineage=kpi.lineage,
         access_roles=kpi.access_roles,
+        owner=kpi.owner,
         history_days=len(kpi.timeseries),
     )

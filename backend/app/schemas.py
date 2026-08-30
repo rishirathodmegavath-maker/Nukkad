@@ -41,6 +41,7 @@ class KPISummary(BaseModel):
     source_system: str  # simulated upstream system(s) this KPI is reconciled from
     refresh_cadence: str  # e.g. "real-time (streaming)", "hourly batch", "daily batch", "weekly batch"
     access_roles: list[str]  # roles entitled to view this KPI (row/domain-level access control)
+    owner: str  # accountable owner for this KPI — the decision-rights anchor
 
 
 class KPIDetail(KPISummary):
@@ -73,6 +74,7 @@ class KPIContract(BaseModel):
     refresh_cadence: str
     lineage: str
     access_roles: list[str]
+    owner: str
     history_days: int
 
 
@@ -80,6 +82,29 @@ class ProcessingStep(BaseModel):
     step: str
     method: str  # "deterministic" | "llm" | "retrieval"
     detail: str
+
+
+class Materiality(BaseModel):
+    """Materiality = statistical significance blended with estimated $ business
+    impact, not statistical significance alone — a movement can be
+    statistically loud but financially small, or vice versa."""
+
+    score: float  # 0-1
+    statistical_component: float  # 0-1
+    business_impact_component: float  # 0-1
+    estimated_impact: str  # human-readable $ or magnitude estimate
+    reasoning: str
+
+
+class DecisionAuthority(BaseModel):
+    """Decision rights: does the *viewing* role actually own this KPI's
+    domain (can authorize the recommended actions), or are they read/
+    diagnostic-only and must escalate to the owner?"""
+
+    role: str
+    owner: str
+    can_authorize: bool
+    note: str
 
 
 class Telemetry(BaseModel):
@@ -107,6 +132,8 @@ class AnalysisResult(BaseModel):
     confidence_reasoning: str
     is_ambiguous: bool
     recommended_actions: list[str]
+    materiality: Materiality
+    decision_authority: DecisionAuthority
     narrative: str
     narrative_source: Literal["llm", "template"]
     processing_steps: list[ProcessingStep]

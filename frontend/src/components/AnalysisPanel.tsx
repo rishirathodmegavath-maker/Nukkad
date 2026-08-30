@@ -37,6 +37,42 @@ function ConfidenceMeter({ value, reasoning }: { value: number; reasoning: strin
   )
 }
 
+function MaterialityMeter({ m }: { m: AnalysisResult['materiality'] }) {
+  const pct = Math.round(m.score * 100)
+  const color = m.score >= 0.7 ? 'var(--critical)' : m.score >= 0.4 ? 'var(--warning)' : 'var(--text-secondary)'
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-xs font-medium text-[var(--text-secondary)]">Materiality (signal + $ impact)</span>
+        <span className="text-sm font-semibold tabular" style={{ color }}>
+          {pct}%
+        </span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <p className="text-xs text-[var(--text-muted)] mt-1.5">
+        {m.estimated_impact} — {m.reasoning}
+      </p>
+    </div>
+  )
+}
+
+function DecisionAuthorityNote({ d }: { d: AnalysisResult['decision_authority'] }) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2 text-xs"
+      style={{
+        borderColor: d.can_authorize ? 'var(--good)' : 'var(--warning)',
+        background: d.can_authorize ? 'var(--good-bg)' : 'var(--warning-bg)',
+        color: 'var(--text-primary)',
+      }}
+    >
+      <span className="font-semibold">{d.can_authorize ? 'Authorized to act' : 'Escalation required'}:</span> {d.note}
+    </div>
+  )
+}
+
 function ProcessingBreakdown({ steps }: { steps: AnalysisResult['processing_steps'] }) {
   return (
     <div>
@@ -247,6 +283,10 @@ export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
           <p className="text-sm leading-relaxed">{result.narrative}</p>
 
           <ConfidenceMeter value={result.confidence} reasoning={result.confidence_reasoning} />
+
+          <MaterialityMeter m={result.materiality} />
+
+          <DecisionAuthorityNote d={result.decision_authority} />
 
           {result.known_drivers.length > 0 && (
             <div>

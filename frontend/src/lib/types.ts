@@ -48,6 +48,7 @@ export interface KpiDetail extends KpiSummary {
   calculation: string
   lineage: string
   known_drivers: string[]
+  owner: string
 }
 
 export interface KpiContract {
@@ -63,7 +64,23 @@ export interface KpiContract {
   refresh_cadence: string
   lineage: string
   access_roles: string[]
+  owner: string
   history_days: number
+}
+
+export interface Materiality {
+  score: number
+  statistical_component: number
+  business_impact_component: number
+  estimated_impact: string
+  reasoning: string
+}
+
+export interface DecisionAuthority {
+  role: string
+  owner: string
+  can_authorize: boolean
+  note: string
 }
 
 export interface ProcessingStep {
@@ -95,6 +112,8 @@ export interface AnalysisResult {
   confidence_reasoning: string
   is_ambiguous: boolean
   recommended_actions: string[]
+  materiality: Materiality
+  decision_authority: DecisionAuthority
   narrative: string
   narrative_source: 'llm' | 'template'
   processing_steps: ProcessingStep[]
