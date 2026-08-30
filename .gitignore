@@ -23,3 +23,6 @@ Thumbs.db
 # Crash logs / lock files
 hs_err_pid*.log
 ~$*
+
+# Scratch/testing artifacts (not source)
+scratch/
