@@ -32,10 +32,22 @@ export interface BreakdownItem {
   contribution_pct: number
 }
 
+export interface InteractionEffect {
+  dimensions: string[]
+  segments: string[]
+  contribution_pct: number
+  pct_change: number
+  sample_size: number
+}
+
 export interface EvidenceItem {
   source: string
   text: string
   relevance: 'supporting' | 'contextual'
+  document_id: string | null
+  retrieval_score: number | null
+  freshness: string | null
+  lineage: string | null
 }
 
 export interface KpiDetail extends KpiSummary {
@@ -49,6 +61,10 @@ export interface KpiDetail extends KpiSummary {
   lineage: string
   known_drivers: string[]
   owner: string
+  interaction_effects: InteractionEffect[]
+  business_impact_per_unit_usd: number
+  business_impact_basis: string
+  redacted_fields: string[]
 }
 
 export interface KpiContract {
@@ -66,6 +82,10 @@ export interface KpiContract {
   access_roles: string[]
   owner: string
   history_days: number
+  business_impact_per_unit_usd: number
+  business_impact_basis: string
+  field_access: Record<string, string[]>
+  redacted_fields: string[]
 }
 
 export interface Materiality {
@@ -83,6 +103,22 @@ export interface DecisionAuthority {
   note: string
 }
 
+export interface ActionItem {
+  driver: string
+  lever: string
+  action: string
+  owner: string
+  confidence: number
+  monitoring_plan: string
+}
+
+export interface FeedbackSignal {
+  sample_size: number
+  useful_rate: number | null
+  recalibration_flag: boolean
+  note: string
+}
+
 export interface ProcessingStep {
   step: string
   method: string
@@ -96,6 +132,7 @@ export interface Telemetry {
   input_tokens: number
   output_tokens: number
   estimated_cost_usd: number
+  llm_error: string | null
 }
 
 export interface AnalysisResult {
@@ -106,17 +143,19 @@ export interface AnalysisResult {
   likely_cause: string
   evidence: EvidenceItem[]
   contributing_factors: BreakdownItem[]
+  interaction_effects: InteractionEffect[]
   known_drivers: string[]
   significance: Significance
   confidence: number
   confidence_reasoning: string
   is_ambiguous: boolean
-  recommended_actions: string[]
+  recommended_actions: ActionItem[]
   materiality: Materiality
   decision_authority: DecisionAuthority
   expected_value: number
   expected_deviation_pct: number
   cohort_benchmark: string | null
+  feedback_signal: FeedbackSignal
   narrative: string
   narrative_source: 'llm' | 'template'
   processing_steps: ProcessingStep[]
@@ -160,4 +199,13 @@ export interface FeedbackSummary {
   not_useful_count: number
   useful_rate: number | null
   note: string
+}
+
+export interface ConnectorStatus {
+  id: string
+  kind: string
+  configured: boolean
+  state: string
+  latency_ms: number | null
+  detail: string
 }

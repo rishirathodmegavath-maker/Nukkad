@@ -76,6 +76,28 @@ function ContractViewer({ kpiId, role }: { kpiId: string; role: string }) {
             <dt className="text-[var(--text-muted)] uppercase tracking-wide mb-0.5">History available</dt>
             <dd className="text-[var(--text-secondary)]">{contract.history_days} day(s)</dd>
           </div>
+          <div>
+            <dt className="text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Business impact basis</dt>
+            <dd className="text-[var(--text-secondary)]">
+              ${contract.business_impact_per_unit_usd.toLocaleString()} per unit — {contract.business_impact_basis}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[var(--text-muted)] uppercase tracking-wide mb-1">Field-level access</dt>
+            <dd className="space-y-1">
+              {Object.entries(contract.field_access).map(([field, roles]) => (
+                <p key={field} className="text-[var(--text-secondary)]">
+                  <span className="font-medium text-[var(--text-primary)]">{field}:</span> {roles.join(', ')}
+                </p>
+              ))}
+            </dd>
+          </div>
+          {contract.redacted_fields.length > 0 && (
+            <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--warning)', background: 'var(--warning-bg)' }}>
+              <span className="font-semibold text-[var(--text-primary)]">Redacted for this role: </span>
+              {contract.redacted_fields.join(', ')}
+            </div>
+          )}
         </dl>
       )}
     </div>
@@ -130,6 +152,12 @@ export function KpiDetail() {
         </div>
         <StatusBadge status={kpi.status} />
       </div>
+
+      {kpi.redacted_fields.length > 0 && (
+        <div className="rounded-lg border px-3 py-2 text-xs mb-4" style={{ borderColor: 'var(--warning)', background: 'var(--warning-bg)', color: 'var(--text-primary)' }}>
+          🔒 Some fields are restricted for your current role and redacted below: {kpi.redacted_fields.join(', ')}.
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

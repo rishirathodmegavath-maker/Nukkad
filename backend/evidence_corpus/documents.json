@@ -1,0 +1,10 @@
+[
+  {"id":"crm-1042","source":"Salesforce CRM note","freshness":"2 days ago","lineage":"salesforce.account_notes/1042","text":"TitanCorp cancelled its APAC enterprise renewal after a budget freeze; renewal value was concentrated in the Enterprise channel."},
+  {"id":"support-882","source":"Zendesk support digest","freshness":"1 day ago","lineage":"zendesk.ticket_digest/882","text":"APAC online and retail customers show no broad increase in cancellation or churn complaints."},
+  {"id":"webperf-310","source":"Web performance incident","freshness":"3 hours ago","lineage":"pagerduty.incident/310 + nginx.rum","text":"EMEA checkout page latency rose by approximately 600 milliseconds, with the largest conversion loss on Paid Search mobile sessions."},
+  {"id":"payments-455","source":"Payments support cluster","freshness":"6 hours ago","lineage":"zendesk.cluster/455","text":"Payment-step failures increased across EMEA traffic sources, especially mobile users; no single acquisition channel fully explains the decline."},
+  {"id":"latam-77","source":"PagerDuty incident review","freshness":"1 day ago","lineage":"pagerduty.incident/77","text":"LATAM payment gateway failover was deployed after a 13-day outage and checkout success has returned to baseline."},
+  {"id":"smb-201","source":"Cancellation survey digest","freshness":"4 days ago","lineage":"zendesk.survey_digest/201","text":"Global SMB cancellation surveys contain mixed reasons and no dominant complaint theme across tenure cohorts."},
+  {"id":"launch-612","source":"AI Copilot launch log","freshness":"today","lineage":"amplitude.release/612","text":"AI Copilot launched 12 days ago and the general-availability cohort is still being ramped in batches."},
+  {"id":"orders-908","source":"Marketing and OMS calendar","freshness":"today","lineage":"oms.daily/908 + marketing.calendar","text":"North America online orders are stable; no major campaign began or ended during the current comparison window."}
+]

@@ -22,10 +22,24 @@ class BreakdownItem(BaseModel):
     contribution_pct: float  # share of the TOTAL metric change explained by this segment
 
 
+class InteractionEffect(BaseModel):
+    """Ranked two-dimensional segment interaction (for example channel x device)."""
+
+    dimensions: list[str]
+    segments: list[str]
+    contribution_pct: float
+    pct_change: float
+    sample_size: int
+
+
 class EvidenceItem(BaseModel):
     source: str  # e.g. "CRM note", "Support tickets", "Marketing calendar"
     text: str
     relevance: Literal["supporting", "contextual"]
+    document_id: str | None = None
+    retrieval_score: float | None = None
+    freshness: str | None = None
+    lineage: str | None = None
 
 
 class KPISummary(BaseModel):
@@ -55,6 +69,10 @@ class KPIDetail(KPISummary):
     lineage: str  # source-to-metric data lineage
     known_drivers: list[str] = []  # simulated known/likely contributing factors, for multi-factor scenarios
     cohort_benchmark: str | None = None  # comparable-cohort baseline, for sparse-history KPIs
+    interaction_effects: list[InteractionEffect] = []
+    business_impact_per_unit_usd: float = 0.0
+    business_impact_basis: str = ""
+    redacted_fields: list[str] = []
 
 
 class KPIContract(BaseModel):
@@ -77,6 +95,10 @@ class KPIContract(BaseModel):
     access_roles: list[str]
     owner: str
     history_days: int
+    business_impact_per_unit_usd: float
+    business_impact_basis: str
+    field_access: dict[str, list[str]]
+    redacted_fields: list[str] = []
 
 
 class ProcessingStep(BaseModel):
@@ -108,6 +130,30 @@ class DecisionAuthority(BaseModel):
     note: str
 
 
+class ActionItem(BaseModel):
+    """One recommended action, structured as the Round 2 brief specifies:
+    driver -> controllable lever -> action -> owner -> confidence ->
+    monitoring plan. Not just a sentence — a governed, auditable unit."""
+
+    driver: str
+    lever: str
+    action: str
+    owner: str
+    confidence: float
+    monitoring_plan: str
+
+
+class FeedbackSignal(BaseModel):
+    """What past human feedback on this KPI says, and whether it actually
+    moved this run's confidence score (see score_confidence's
+    recalibration_flag) — the loop is real, not just captured-and-ignored."""
+
+    sample_size: int
+    useful_rate: float | None
+    recalibration_flag: bool
+    note: str
+
+
 class Telemetry(BaseModel):
     model_config = {"protected_namespaces": ()}
 
@@ -117,6 +163,7 @@ class Telemetry(BaseModel):
     input_tokens: int
     output_tokens: int
     estimated_cost_usd: float
+    llm_error: str | None = None  # e.g. "no_api_key_configured", "timeout", "http_529", "call_failed"
 
 
 class AnalysisResult(BaseModel):
@@ -127,17 +174,19 @@ class AnalysisResult(BaseModel):
     likely_cause: str
     evidence: list[EvidenceItem]
     contributing_factors: list[BreakdownItem]
+    interaction_effects: list[InteractionEffect]
     known_drivers: list[str]
     significance: Literal["noise", "meaningful", "severe"]
     confidence: float  # 0-1
     confidence_reasoning: str
     is_ambiguous: bool
-    recommended_actions: list[str]
+    recommended_actions: list[ActionItem]
     materiality: Materiality
     decision_authority: DecisionAuthority
     expected_value: float  # simple trend-line forecast baseline ("what we'd expect")
     expected_deviation_pct: float  # actual vs. expected_value, distinct from vs.-prior-period pct_change
     cohort_benchmark: str | None = None
+    feedback_signal: FeedbackSignal
     narrative: str
     narrative_source: Literal["llm", "template"]
     processing_steps: list[ProcessingStep]
@@ -182,9 +231,10 @@ class FeedbackEntry(BaseModel):
 
 
 class FeedbackSummary(BaseModel):
-    """Aggregated feedback for one KPI — the input a periodic recalibration
-    job would consume. This prototype computes and exposes the aggregate;
-    it does not yet feed it back into live confidence scoring."""
+    """Aggregated feedback for one KPI. Also consumed live: analyze_kpi
+    queries this same aggregate and passes a recalibration flag into
+    score_confidence, so an unfavorable feedback trend actually trims the
+    next run's confidence — see FeedbackSignal on AnalysisResult."""
 
     kpi_id: str
     total_feedback: int

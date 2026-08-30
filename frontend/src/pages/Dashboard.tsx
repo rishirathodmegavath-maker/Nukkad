@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { KpiSummary } from '../lib/types'
 import { KpiCard } from '../components/KpiCard'
+import { ConnectorsPanel } from '../components/ConnectorsPanel'
 import { useRole } from '../lib/roleContext'
 
 function Hero() {
@@ -60,6 +61,8 @@ export function Dashboard() {
   return (
     <div>
       <Hero />
+
+      <ConnectorsPanel />
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">

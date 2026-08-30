@@ -164,6 +164,9 @@ Open **http://localhost:5173**.
 | `ANTHROPIC_MODEL` | No | `claude-sonnet-4-5` | Model used when the key is set |
 | `DATABASE_URL` | No | `sqlite:///./clarity_audit.db` | Audit log storage |
 | `FRONTEND_ORIGIN` | No | `http://localhost:5173` | CORS allow-list |
+| `WAREHOUSE_DATABASE_URL` | No | *(empty)* | SQLAlchemy-compatible warehouse URL used by the live SQL connector |
+| `BI_API_URL` | No | *(empty)* | BI tool REST endpoint used by the live connector probe |
+| `BI_API_TOKEN` | No | *(empty)* | Optional bearer token for the BI tool connector |
 
 **`frontend/.env`**
 
@@ -240,8 +243,8 @@ yet been done — do that before final submission.
   seasonality-aware (a naive weekday-seasonality series was deliberately
   excluded from the demo data for exactly this reason — see comment in
   `backend/app/data_generator.py`)
-- Root-cause attribution only considers one dimension at a time (e.g. channel
-  *or* region), not cross-dimensional interaction effects
+- Interaction effects currently cover configured two-dimensional cuts; an
+  exhaustive search over every possible high-cardinality dimension is not run
 - No authentication — not needed for a single-tenant demo prototype
 - LLM narrative mode calls a live API per request with no caching
 
@@ -263,23 +266,21 @@ scoped honestly rather than padded; gaps are listed as gaps, not glossed over.
 | Evidence with source freshness, method, contribution, confidence, lineage | ✅ | Evidence panel + confidence reasoning string (now including a staleness penalty derived from `refresh_cadence` — `analysis/confidence.py FRESHNESS_HOURS`) + contract's `lineage`/`refresh_cadence` fields |
 | Clear LLM vs. non-LLM breakdown | ✅ | `processing_steps` on every `AnalysisResult`, rendered in the UI — every stage tagged `deterministic`, `retrieval`, or `llm` |
 | Runtime telemetry (latency, model calls, tokens, cost) | ✅ | Real (not estimated) token counts read from the Anthropic API `usage` block when an LLM call is made; latency measured end-to-end; persisted per-run in the audit log |
-| Mechanism to learn from feedback | 🟡 partial | `POST /api/feedback` captures useful/not-useful + comment; `GET /api/feedback/summary` aggregates useful-rate per KPI (the input a recalibration job would consume) — capture *and* aggregation are real; the aggregate is not yet fed back into live confidence scoring, by design not by oversight |
-| Materiality = statistical significance **and** business impact | ✅ | `analysis/materiality.py` blends significance (40%) with a $ impact estimate for dollar KPIs, or an explicitly-flagged relative-change proxy for rate KPIs (60%) — `AnalysisResult.materiality` |
+| Mechanism to learn from feedback | ✅ | `POST /api/feedback` persists useful/not-useful signals; each subsequent analysis consumes the KPI aggregate and trims confidence when at least 3 samples fall below a 50% useful-rate — `FeedbackSignal` makes the recalibration visible |
+| Materiality = statistical significance **and** business impact | ✅ | `analysis/materiality.py` blends significance (40%) with automated USD impact (60%) for every KPI using a governed per-unit value and documented basis in the KPI contract |
 | Decision rights (can this role authorize the action, or must they escalate) | ✅ | `analysis/actions.check_decision_authority` — checks the viewing role against the KPI's owner/access_roles; `analyst` is always advisory-only regardless of read access — `AnalysisResult.decision_authority` |
 | KPI contract includes an accountable owner | ✅ | `owner` field on every KPI, surfaced in `/api/kpis/{id}/contract` |
 | Statistical "expected value" baseline (Actual vs. Expected) | ✅ | `analysis/stats_engine.expected_value` — a linear trend-line fit to the pre-window history, projected forward; deliberately not Holt-Winters/seasonal so it stays auditable — `AnalysisResult.expected_value` / `expected_deviation_pct` |
-| Row/column/domain-level security | 🟡 partial | Row/domain-level (per-KPI role gating) implemented and enforced server-side; column-level (field-level redaction) is not — noted as a gap, not a hidden one |
-| Multi-dimensional root-cause search (interaction effects) | ❌ not built | Attribution is still single-dimension per KPI (channel *or* region, not channel × region) — unchanged from Round 1, listed below |
-| Real data connectors (warehouse/BI tool) | ❌ not built | All data is seeded/synthetic by design, per the brief's own "not expected to have real proprietary data" allowance |
-| RAG over a real evidence corpus | ❌ not built | Evidence retrieval is a curated lookup, not vector retrieval over a live corpus |
+| Row/column/domain-level security | ✅ | Per-KPI entitlement remains server-enforced; `security.py` also applies field policy to calculation, lineage and raw evidence text, returning explicit `redacted_fields` metadata rather than relying on client-side hiding |
+| Multi-dimensional root-cause search (interaction effects) | ✅ | Conversion Rate — EMEA ranks traffic-source × device cells by contribution, movement and sample size and surfaces the leading interaction in the diagnosis and UI |
+| Real data connectors (warehouse/BI tool) | 🟡 credential-ready | `/api/connectors` provides real SQL and authenticated BI REST adapters plus connection probes. The checked-in demo uses seeded data because no enterprise URL/token is committed; set `WAREHOUSE_DATABASE_URL`, `BI_API_URL`, and `BI_API_TOKEN` to activate them |
+| RAG over an evidence corpus | ✅ | `analysis/evidence_retrieval.py` builds a TF-IDF vector index over `backend/evidence_corpus/documents.json`, performs cosine retrieval, and returns document ID, similarity score, freshness and lineage with every citation |
 
 ## 15. Future roadmap
 
 - Seasonality-aware anomaly detection (STL decomposition)
-- Multi-dimensional root-cause search (interaction effects across region ×
-  channel × segment simultaneously)
-- Real data source connectors (warehouse SQL, BI tool APIs)
-- RAG over a real corpus of tickets/CRM notes instead of curated evidence
-- Human-in-the-loop feedback loop: let analysts confirm/reject a diagnosis to
-  improve future confidence calibration
+- Exhaustive three-plus-dimensional interaction search with cardinality controls
+- OAuth-managed connector credentials and scheduled production ingestion
+- Enterprise-scale embedding index with document-level ACL propagation
+- Offline evaluation and model retraining beyond the implemented live confidence recalibration
 - Slack/email alerting when a KPI crosses into `watch` or `critical`

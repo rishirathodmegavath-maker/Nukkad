@@ -2,41 +2,123 @@
 lookup, not an LLM decision — recommending a business action is exactly
 the kind of deterministic, auditable step that should NOT be left to a
 non-deterministic model.
+
+Each action is returned as a structured driver -> lever -> action -> owner
+-> confidence -> monitoring-plan record, per the Round 2 brief's own
+solutioning spec, rather than a bare sentence.
 """
 from __future__ import annotations
 
+from ..schemas import ActionItem
 
-def recommend_actions(status: str, is_ambiguous: bool, dimension: str, driver_segment: str | None) -> list[str]:
+
+def recommend_actions(
+    status: str,
+    is_ambiguous: bool,
+    dimension: str,
+    driver_segment: str | None,
+    owner: str,
+    confidence: float,
+) -> list[ActionItem]:
+    driver = driver_segment or (f"No dominant {dimension} segment" if is_ambiguous else dimension)
+
     if status == "recovered":
         return [
-            "Document the intervention that drove the recovery as a reusable playbook.",
-            "Monitor for 2 more cycles to confirm the recovery is durable, not a rebound blip.",
+            ActionItem(
+                driver=driver,
+                lever="Playbook capture",
+                action="Document the intervention that drove the recovery as a reusable playbook.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Re-check in 2 more reporting cycles to confirm the recovery is durable, not a rebound blip.",
+            ),
+            ActionItem(
+                driver=driver,
+                lever="Monitoring cadence",
+                action="Continue routine monitoring before formally closing this incident out.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Auto-flag again if the metric dips more than 5% below the recovered baseline.",
+            ),
         ]
 
     if is_ambiguous:
         return [
-            f"Assign an analyst for a manual deep-dive — no single {dimension} segment explains the change.",
-            "Increase data instrumentation for this metric before the next automated review.",
-            "Re-run this analysis in 3-5 days once more data has accumulated.",
+            ActionItem(
+                driver=driver,
+                lever="Manual investigation",
+                action=f"Assign an analyst for a manual deep-dive — no single {dimension} segment explains the change.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Re-run this automated analysis in 3-5 days once more data has accumulated.",
+            ),
+            ActionItem(
+                driver=driver,
+                lever="Instrumentation",
+                action="Increase data instrumentation for this metric before the next automated review.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Confirm data completeness has improved before trusting the next automated read.",
+            ),
         ]
 
     if status == "critical":
         return [
-            f"Escalate to the {driver_segment} segment owner within 24 hours.",
-            "Open an incident review to confirm root cause before customer/investor communication.",
-            "Quantify revenue-at-risk from similar accounts/segments to size the exposure.",
+            ActionItem(
+                driver=driver,
+                lever="Escalation",
+                action=f"Escalate to the {driver_segment} segment owner within 24 hours.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Confirm root-cause acknowledgment from the segment owner within 24h.",
+            ),
+            ActionItem(
+                driver=driver,
+                lever="Incident review",
+                action="Open an incident review to confirm root cause before customer/investor communication.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Track incident-review completion; confirm no external comms went out prematurely.",
+            ),
+            ActionItem(
+                driver=driver,
+                lever="Exposure sizing",
+                action="Quantify revenue-at-risk from similar accounts/segments to size the exposure.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Compare the sized exposure estimate against next period's actuals.",
+            ),
         ]
 
     if status == "watch":
         return [
-            f"Investigate the {driver_segment or dimension} trend with the responsible team this week.",
-            "Set an automated alert if the trend continues for 5 more consecutive days.",
-            "Consider a controlled experiment (A/B test) to test a corrective intervention.",
+            ActionItem(
+                driver=driver,
+                lever="Investigation",
+                action=f"Investigate the {driver_segment or dimension} trend with the responsible team this week.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Set an automated alert if the trend continues for 5 more consecutive days.",
+            ),
+            ActionItem(
+                driver=driver,
+                lever="Experimentation",
+                action="Consider a controlled experiment (A/B test) to test a corrective intervention.",
+                owner=owner,
+                confidence=confidence,
+                monitoring_plan="Compare experiment vs. control on this KPI over the following reporting cycle.",
+            ),
         ]
 
     return [
-        "No action required — metric is within normal operating range.",
-        "Continue routine monitoring.",
+        ActionItem(
+            driver="none",
+            lever="Routine monitoring",
+            action="No action required — metric is within normal operating range.",
+            owner=owner,
+            confidence=confidence,
+            monitoring_plan="Continue routine monitoring; no special follow-up needed.",
+        ),
     ]
 
 

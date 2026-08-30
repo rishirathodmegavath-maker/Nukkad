@@ -18,7 +18,7 @@ from datetime import date, timedelta
 import numpy as np
 
 from .analysis.stats_engine import classify_significance, detect_recovery, determine_status, rolling_anomaly_flags
-from .schemas import BreakdownItem, EvidenceItem, KPIDetail, TimeseriesPoint
+from .schemas import BreakdownItem, EvidenceItem, InteractionEffect, KPIDetail, TimeseriesPoint
 
 DAYS = 90
 TODAY = date.today()
@@ -84,8 +84,11 @@ def _make_kpi(
     lineage: str,
     access_roles: list[str],
     owner: str,
+    business_impact_per_unit_usd: float,
+    business_impact_basis: str,
     known_drivers: list[str] | None = None,
     cohort_benchmark: str | None = None,
+    interaction_effects: list[InteractionEffect] | None = None,
 ) -> KPIDetail:
     dates = _dates(len(series))
     values = series.tolist()
@@ -129,6 +132,9 @@ def _make_kpi(
         owner=owner,
         known_drivers=known_drivers or [],
         cohort_benchmark=cohort_benchmark,
+        interaction_effects=interaction_effects or [],
+        business_impact_per_unit_usd=business_impact_per_unit_usd,
+        business_impact_basis=business_impact_basis,
     )
 
 
@@ -156,6 +162,8 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, joined to Salesforce account/channel dims.",
         access_roles=["global_exec", "apac_manager", "analyst"],
         owner="APAC Regional Manager",
+        business_impact_per_unit_usd=1000.0,
+        business_impact_basis="Each $K unit equals USD 1,000 of recognized daily revenue.",
         known_drivers=["Single dominant driver: Enterprise segment account churn (TitanCorp cancellation)"],
     )
 
@@ -180,6 +188,8 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="OMS Kafka topic -> stream aggregator -> orders_daily materialized view.",
         access_roles=["global_exec", "na_manager", "analyst"],
         owner="NA Regional Manager",
+        business_impact_per_unit_usd=85.0,
+        business_impact_basis="Average contribution margin per completed order is USD 85.",
     )
 
     # 3. WATCH: slow gradual decline across the whole window, broad-based.
@@ -205,9 +215,16 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="Amplitude events + nginx access logs -> hourly Spark job -> conversion_hourly -> daily rollup.",
         access_roles=["global_exec", "emea_manager", "analyst"],
         owner="EMEA Regional Manager",
+        business_impact_per_unit_usd=165000.0,
+        business_impact_basis="One conversion percentage point represents about USD 165K monthly gross margin at current EMEA traffic and AOV.",
         known_drivers=[
             "Checkout latency regression (+600ms) affecting all traffic sources equally",
             "Broad-based decline across channels — no single traffic-source outlier",
+        ],
+        interaction_effects=[
+            InteractionEffect(dimensions=["traffic source", "device"], segments=["Paid Search", "Mobile"], contribution_pct=24.0, pct_change=-21.4, sample_size=18420),
+            InteractionEffect(dimensions=["traffic source", "device"], segments=["Organic", "Mobile"], contribution_pct=19.0, pct_change=-16.7, sample_size=22110),
+            InteractionEffect(dimensions=["traffic source", "device"], segments=["Direct", "Desktop"], contribution_pct=13.0, pct_change=-8.9, sample_size=14380),
         ],
     )
 
@@ -232,6 +249,8 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, annotated with PagerDuty incident overlays.",
         access_roles=["global_exec", "latam_manager", "analyst"],
         owner="LATAM Regional Manager",
+        business_impact_per_unit_usd=1000.0,
+        business_impact_basis="Each $K unit equals USD 1,000 of recognized daily revenue.",
         known_drivers=["Payment gateway outage (13 days) — resolved, recovery attributable to the fix"],
     )
 
@@ -254,6 +273,8 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="Salesforce account status + Zendesk cancellation surveys -> weekly batch join -> churn_weekly.",
         access_roles=["global_exec", "analyst"],
         owner="Head of Retention (Global SMB)",
+        business_impact_per_unit_usd=240000.0,
+        business_impact_basis="One churn percentage point represents about USD 240K annual recurring revenue at risk for the SMB base.",
     )
 
     # 6. SPARSE-HISTORY: newly launched feature, only 12 days of data — not
@@ -278,6 +299,8 @@ def _generate_all() -> dict[str, KPIDetail]:
         lineage="Amplitude event stream -> nightly ETL -> activation_daily table (feature launched 12 days ago).",
         access_roles=["global_exec", "product_lead", "analyst"],
         owner="Product Lead — AI Copilot",
+        business_impact_per_unit_usd=42000.0,
+        business_impact_basis="One activation percentage point represents about USD 42K modeled annual expansion value at current rollout volume.",
         known_drivers=[
             "Only 12 days of history available — no reliable trend baseline yet",
             "GA rollout still ramping in batches, not yet at steady state",

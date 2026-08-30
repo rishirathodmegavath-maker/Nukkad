@@ -350,6 +350,22 @@ export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
             <BreakdownChart data={result.contributing_factors} />
           </div>
 
+          {result.interaction_effects.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">
+                Interaction effects (multi-dimensional)
+              </p>
+              <ul className="space-y-1.5">
+                {result.interaction_effects.map((effect, i) => (
+                  <li key={i} className="text-xs rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                    <span className="font-medium">{effect.segments.join(' x ')}</span>
+                    <span className="text-[var(--text-secondary)]"> — {effect.contribution_pct.toFixed(0)}% contribution, {effect.pct_change.toFixed(1)}% movement, n={effect.sample_size.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">Evidence</p>
             <ul className="space-y-1.5">
@@ -357,6 +373,11 @@ export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
                 <li key={i} className="text-xs rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
                   <span className="font-medium">{e.source}</span>
                   <span className="text-[var(--text-secondary)]"> — "{e.text}"</span>
+                  {e.document_id && (
+                    <span className="block mt-1 text-[10px] text-[var(--text-muted)]">
+                      doc {e.document_id} · score {(e.retrieval_score ?? 0).toFixed(3)} · {e.freshness} · {e.lineage}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -366,12 +387,17 @@ export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
             <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">Recommended actions</p>
             <ul className="space-y-1.5">
               {result.recommended_actions.map((a, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="mt-0.5 text-[var(--brand)]">{i + 1}.</span>
-                  {a}
+                <li key={i} className="text-xs rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                  <span className="font-medium">{i + 1}. {a.action}</span>
+                  <span className="block mt-1 text-[var(--text-secondary)]">Driver: {a.driver} · Lever: {a.lever} · Owner: {a.owner} · Confidence: {Math.round(a.confidence * 100)}%</span>
+                  <span className="block mt-1 text-[var(--text-muted)]">Monitor: {a.monitoring_plan}</span>
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: result.feedback_signal.recalibration_flag ? 'var(--warning)' : 'var(--border)' }}>
+            <span className="font-semibold">Feedback learning: </span>{result.feedback_signal.note}
           </div>
 
           <ProcessingBreakdown steps={result.processing_steps} />

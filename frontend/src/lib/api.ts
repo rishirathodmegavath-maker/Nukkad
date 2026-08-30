@@ -1,6 +1,7 @@
 import type {
   AnalysisResult,
   AuditLogEntry,
+  ConnectorStatus,
   FeedbackEntry,
   FeedbackSummary,
   KpiContract,
@@ -40,5 +41,7 @@ export const api = {
     request<FeedbackEntry>('/api/feedback', { method: 'POST', body: JSON.stringify(payload) }),
   getFeedbackSummary: (kpiId: string) =>
     request<FeedbackSummary>(`/api/feedback/summary?kpi_id=${encodeURIComponent(kpiId)}`),
+  listConnectors: () => request<ConnectorStatus[]>('/api/connectors'),
+  testConnector: (id: string) => request<ConnectorStatus>(`/api/connectors/${id}/test`, { method: 'POST' }),
   health: () => request<{ status: string }>('/api/health'),
 }

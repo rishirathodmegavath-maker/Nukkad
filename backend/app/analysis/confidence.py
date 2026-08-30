@@ -30,6 +30,7 @@ def score_confidence(
     evidence_count: int,
     history_days: int = 90,
     refresh_cadence: str = "daily batch",
+    recalibration_flag: bool = False,
 ) -> tuple[float, str]:
     base = SIGNIFICANCE_BASE[significance]
     reasons = [f"statistical signal is '{significance}' (base {base:.2f})"]
@@ -56,6 +57,13 @@ def score_confidence(
         reasons.append(
             f"source refreshes {refresh_cadence} (~{freshness_hours:.0f}h since last update) — "
             "confidence trimmed for staleness risk"
+        )
+
+    if recalibration_flag:
+        score *= 0.9
+        reasons.append(
+            "past user feedback on this KPI's explanations trended unfavorable (below the "
+            "recalibration threshold) — confidence trimmed pending review"
         )
 
     if history_days < SPARSE_HISTORY_THRESHOLD_DAYS:

@@ -38,7 +38,7 @@ def feedback_summary(kpi_id: str, db: Session = Depends(get_db)):
     useful = sum(1 for r in rows if r.useful)
     useful_rate = round(useful / total, 2) if total else None
     note = (
-        "Aggregated for a future periodic-recalibration job — not yet fed back into live confidence scoring."
+        "Consumed by the next analysis run; after 3 samples, a useful-rate below 50% trims confidence by 10%."
         if total
         else "No feedback recorded yet for this KPI."
     )

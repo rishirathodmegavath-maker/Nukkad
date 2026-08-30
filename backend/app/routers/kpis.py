@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..data_generator import KPI_STORE
 from ..schemas import KPIContract, KPIDetail, KPISummary
+from ..security import FIELD_ACCESS, secure_kpi
 
 router = APIRouter(prefix="/api/kpis", tags=["kpis"])
 
@@ -41,12 +42,12 @@ def list_kpis(role: str = "global_exec"):
 
 @router.get("/{kpi_id}", response_model=KPIDetail)
 def get_kpi(kpi_id: str, role: str = "global_exec"):
-    return _require_access(kpi_id, role)
+    return secure_kpi(_require_access(kpi_id, role), role)
 
 
 @router.get("/{kpi_id}/contract", response_model=KPIContract)
 def get_kpi_contract(kpi_id: str, role: str = "global_exec"):
-    kpi = _require_access(kpi_id, role)
+    kpi = secure_kpi(_require_access(kpi_id, role), role)
     return KPIContract(
         kpi_id=kpi.id,
         name=kpi.name,
@@ -62,4 +63,8 @@ def get_kpi_contract(kpi_id: str, role: str = "global_exec"):
         access_roles=kpi.access_roles,
         owner=kpi.owner,
         history_days=len(kpi.timeseries),
+        business_impact_per_unit_usd=kpi.business_impact_per_unit_usd,
+        business_impact_basis=kpi.business_impact_basis,
+        field_access=FIELD_ACCESS,
+        redacted_fields=kpi.redacted_fields,
     )

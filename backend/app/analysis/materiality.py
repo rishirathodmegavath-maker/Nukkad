@@ -10,12 +10,11 @@ SIGNIFICANCE_SCORE = {"severe": 1.0, "meaningful": 0.6, "noise": 0.15}
 
 # Illustrative impact scale for $-denominated KPIs: a swing at or above this
 # magnitude is treated as maximally material on the business-impact axis.
-DOLLAR_IMPACT_CEILING = {"$K": 60.0}
+BUSINESS_IMPACT_CEILING_USD = 250_000.0
 
 # For non-dollar (rate/count) KPIs there's no direct $ conversion available in
 # this prototype, so business impact falls back to the magnitude of relative
 # change — a smaller, explicitly-flagged proxy rather than a silent guess.
-RELATIVE_IMPACT_CEILING_PCT = 20.0
 
 STATISTICAL_WEIGHT = 0.4
 BUSINESS_IMPACT_WEIGHT = 0.6
@@ -27,20 +26,19 @@ def score_materiality(
     current_value: float,
     prior_value: float,
     unit: str,
+    business_impact_per_unit_usd: float,
+    business_impact_basis: str,
 ) -> tuple[float, float, float, str, str]:
     statistical_component = SIGNIFICANCE_SCORE[significance]
 
-    dollar_ceiling = DOLLAR_IMPACT_CEILING.get(unit)
-    if dollar_ceiling:
-        impact_magnitude = abs(current_value - prior_value)
-        business_impact_component = min(1.0, impact_magnitude / dollar_ceiling)
-        magnitude_unit = unit[1:] if unit.startswith("$") else unit
-        estimated_impact = f"~${impact_magnitude:.1f}{magnitude_unit} swing"
-        impact_basis = f"${impact_magnitude:.1f}{magnitude_unit} magnitude vs a ${dollar_ceiling:.0f}{magnitude_unit} full-materiality reference"
-    else:
-        business_impact_component = min(1.0, abs(pct_change) / RELATIVE_IMPACT_CEILING_PCT)
-        estimated_impact = f"~{abs(pct_change):.1f}% relative move (no direct $ conversion available for this unit)"
-        impact_basis = f"{abs(pct_change):.1f}% relative change vs a {RELATIVE_IMPACT_CEILING_PCT:.0f}% full-materiality reference (proxy, not a real $ estimate)"
+    unit_delta = abs(current_value - prior_value)
+    impact_usd = unit_delta * max(0.0, business_impact_per_unit_usd)
+    business_impact_component = min(1.0, impact_usd / BUSINESS_IMPACT_CEILING_USD)
+    estimated_impact = f"~${impact_usd:,.0f} modeled business impact"
+    impact_basis = (
+        f"{unit_delta:.2f} {unit} movement x ${business_impact_per_unit_usd:,.0f} per unit; "
+        f"{business_impact_basis}"
+    )
 
     score = STATISTICAL_WEIGHT * statistical_component + BUSINESS_IMPACT_WEIGHT * business_impact_component
     score = round(max(0.0, min(1.0, score)), 2)

@@ -23,7 +23,7 @@ import time
 
 import httpx
 
-from ..schemas import BreakdownItem, EvidenceItem, KPIDetail
+from ..schemas import ActionItem, BreakdownItem, EvidenceItem, KPIDetail
 
 # Illustrative public per-1M-token pricing (USD). Swap for your account's
 # actual rate card — this is only meant to make the cost telemetry legible.
@@ -65,7 +65,7 @@ def _template_narrative(
     evidence: list[EvidenceItem],
     confidence: float,
     confidence_reasoning: str,
-    recommended_actions: list[str],
+    recommended_actions: list[ActionItem],
 ) -> str:
     direction = "rose" if pct_change > 0 else "fell"
 
@@ -79,7 +79,7 @@ def _template_narrative(
             sentences.append("No single segment dominates — this is a broad-based movement, not an isolated incident.")
         sentences.append(f"Confidence {confidence * 100:.0f}%.")
         if recommended_actions:
-            sentences.append(f"Recommended: {recommended_actions[0]}")
+            sentences.append(f"Recommended: {recommended_actions[0].action}")
         return " ".join(sentences)
 
     if persona == "ops_manager":
@@ -89,7 +89,7 @@ def _template_narrative(
         ]
         sentences.append(f"Owner to contact: {who}.")
         if recommended_actions:
-            sentences.append(f"Do now: {recommended_actions[0]}")
+            sentences.append(f"Do now: {recommended_actions[0].action}")
         return " ".join(sentences)
 
     # analyst (default/full detail)
@@ -121,7 +121,7 @@ def _template_narrative(
         sentences.append(f'This is consistent with {e.source}: "{e.text}"')
     sentences.append(f"Confidence: {confidence * 100:.0f}% ({confidence_reasoning})")
     if recommended_actions:
-        sentences.append(f"Recommended next step: {recommended_actions[0]}")
+        sentences.append(f"Recommended next step: {recommended_actions[0].action}")
     return " ".join(sentences)
 
 
@@ -132,6 +132,7 @@ def _empty_telemetry() -> dict:
         "input_tokens": 0,
         "output_tokens": 0,
         "estimated_cost_usd": 0.0,
+        "llm_error": None,
     }
 
 
@@ -139,6 +140,7 @@ def _llm_narrative(facts: str, persona: str) -> tuple[str | None, dict]:
     telemetry = _empty_telemetry()
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
+        telemetry["llm_error"] = "no_api_key_configured"
         return None, telemetry
 
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
@@ -182,8 +184,17 @@ def _llm_narrative(facts: str, persona: str) -> tuple[str | None, dict]:
             estimated_cost_usd=round(cost, 6),
         )
         return data["content"][0]["text"].strip(), telemetry
+    except httpx.TimeoutException:
+        telemetry["llm_latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
+        telemetry["llm_error"] = "timeout"
+        return None, telemetry
+    except httpx.HTTPStatusError as e:
+        telemetry["llm_latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
+        telemetry["llm_error"] = f"http_{e.response.status_code}"
+        return None, telemetry
     except Exception:
         telemetry["llm_latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
+        telemetry["llm_error"] = "call_failed"
         return None, telemetry
 
 
@@ -197,7 +208,7 @@ def generate_narrative(
     evidence: list[EvidenceItem],
     confidence: float,
     confidence_reasoning: str,
-    recommended_actions: list[str],
+    recommended_actions: list[ActionItem],
 ) -> tuple[str, str, dict]:
     template = _template_narrative(
         kpi, persona, significance, pct_change, primary_driver, breakdown, evidence,
@@ -210,7 +221,7 @@ def generate_narrative(
         f"Primary driver: {primary_driver.segment + ' (' + f'{primary_driver.contribution_pct:.0f}%' + ' of change)' if primary_driver else 'none - broad based'}. "
         f"Evidence: {evidence[0].text if evidence else 'none'}. "
         f"Confidence: {confidence * 100:.0f}% ({confidence_reasoning}). "
-        f"Recommended action: {recommended_actions[0] if recommended_actions else 'none'}."
+        f"Recommended action: {recommended_actions[0].action if recommended_actions else 'none'}."
     )
     llm_text, telemetry = _llm_narrative(facts_blob, persona)
     if llm_text:

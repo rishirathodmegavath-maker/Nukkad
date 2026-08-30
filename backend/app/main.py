@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
-from .routers import analysis, audit, feedback, kpis
+from .routers import analysis, audit, connectors, feedback, kpis
 
 Base.metadata.create_all(bind=engine)
 
@@ -27,6 +27,7 @@ app.include_router(kpis.router)
 app.include_router(analysis.router)
 app.include_router(audit.router)
 app.include_router(feedback.router)
+app.include_router(connectors.router)
 
 # Simulated role catalog for the row/domain-level access-control demo.
 # Each role gates which KPIs are visible via KPIDetail.access_roles.
