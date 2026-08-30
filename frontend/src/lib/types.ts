@@ -114,6 +114,9 @@ export interface AnalysisResult {
   recommended_actions: string[]
   materiality: Materiality
   decision_authority: DecisionAuthority
+  expected_value: number
+  expected_deviation_pct: number
+  cohort_benchmark: string | null
   narrative: string
   narrative_source: 'llm' | 'template'
   processing_steps: ProcessingStep[]
@@ -148,4 +151,13 @@ export interface FeedbackEntry {
   persona: string
   useful: boolean
   comment: string | null
+}
+
+export interface FeedbackSummary {
+  kpi_id: string
+  total_feedback: number
+  useful_count: number
+  not_useful_count: number
+  useful_rate: number | null
+  note: string
 }

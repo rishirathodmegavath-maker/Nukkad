@@ -10,7 +10,7 @@ from ..analysis.confidence import score_confidence
 from ..analysis.materiality import score_materiality
 from ..analysis.narrative import generate_narrative
 from ..analysis.root_cause import find_primary_driver
-from ..analysis.stats_engine import classify_significance
+from ..analysis.stats_engine import classify_significance, expected_value
 from ..data_generator import KPI_STORE
 from ..database import get_db
 from ..models import AuditLog
@@ -50,7 +50,11 @@ def analyze_kpi(kpi_id: str, persona: Persona = "executive", role: str = "global
         top_contribution_pct=primary_driver.contribution_pct if primary_driver else 0.0,
         evidence_count=len(kpi.evidence),
         history_days=history_days,
+        refresh_cadence=kpi.refresh_cadence,
     )
+
+    expected = expected_value(values)
+    expected_deviation_pct = ((kpi.current_value - expected) / expected * 100) if expected else 0.0
 
     recommended_actions = recommend_actions(
         status=kpi.status,
@@ -163,6 +167,9 @@ def analyze_kpi(kpi_id: str, persona: Persona = "executive", role: str = "global
         recommended_actions=recommended_actions,
         materiality=materiality,
         decision_authority=decision_authority,
+        expected_value=round(expected, 2),
+        expected_deviation_pct=round(expected_deviation_pct, 2),
+        cohort_benchmark=kpi.cohort_benchmark,
         narrative=narrative,
         narrative_source=narrative_source,
         processing_steps=processing_steps,

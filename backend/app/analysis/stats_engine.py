@@ -69,6 +69,26 @@ def classify_significance(values: list[float]) -> tuple[str, float, float]:
     return significance, round(pct_change, 2), round(trend_pct, 2)
 
 
+def expected_value(values: list[float]) -> float:
+    """Simple linear-trend forecast: fits a line to the pre-comparison
+    history (everything except the current 3-day window, which is what's
+    under investigation) and projects it forward to "today". This is the
+    "what would we have expected" baseline behind Actual-vs-Expected —
+    deliberately a plain trend line (no seasonality/Holt-Winters) so it
+    stays auditable rather than a black-box forecast.
+    """
+    arr = np.array(values, dtype=float)
+    if len(arr) <= 4:
+        return float(arr.mean())
+    history = arr[:-3]
+    if len(history) < 2:
+        return float(history.mean())
+    x = np.arange(len(history))
+    slope, intercept = np.polyfit(x, history, 1)
+    projected_index = len(arr) - 2  # midpoint of the current 3-day comparison window
+    return float(slope * projected_index + intercept)
+
+
 def determine_status(significance: str, pct_change: float, higher_is_better: bool, recovered: bool) -> str:
     if recovered:
         return "recovered"

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Feedback
-from ..schemas import FeedbackCreate, FeedbackEntry
+from ..schemas import FeedbackCreate, FeedbackEntry, FeedbackSummary
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
@@ -28,6 +28,27 @@ def submit_feedback(payload: FeedbackCreate, db: Session = Depends(get_db)):
         persona=row.persona,
         useful=row.useful,
         comment=row.comment,
+    )
+
+
+@router.get("/summary", response_model=FeedbackSummary)
+def feedback_summary(kpi_id: str, db: Session = Depends(get_db)):
+    rows = db.query(Feedback).filter(Feedback.kpi_id == kpi_id).all()
+    total = len(rows)
+    useful = sum(1 for r in rows if r.useful)
+    useful_rate = round(useful / total, 2) if total else None
+    note = (
+        "Aggregated for a future periodic-recalibration job — not yet fed back into live confidence scoring."
+        if total
+        else "No feedback recorded yet for this KPI."
+    )
+    return FeedbackSummary(
+        kpi_id=kpi_id,
+        total_feedback=total,
+        useful_count=useful,
+        not_useful_count=total - useful,
+        useful_rate=useful_rate,
+        note=note,
     )
 
 

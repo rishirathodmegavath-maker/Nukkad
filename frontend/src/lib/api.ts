@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   AuditLogEntry,
   FeedbackEntry,
+  FeedbackSummary,
   KpiContract,
   KpiDetail,
   KpiSummary,
@@ -37,5 +38,7 @@ export const api = {
   listRoles: () => request<RoleOption[]>('/api/roles'),
   submitFeedback: (payload: { kpi_id: string; persona: Persona; useful: boolean; comment?: string }) =>
     request<FeedbackEntry>('/api/feedback', { method: 'POST', body: JSON.stringify(payload) }),
+  getFeedbackSummary: (kpiId: string) =>
+    request<FeedbackSummary>(`/api/feedback/summary?kpi_id=${encodeURIComponent(kpiId)}`),
   health: () => request<{ status: string }>('/api/health'),
 }

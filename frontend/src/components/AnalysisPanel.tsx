@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AnalysisResult, KpiDetail, Persona } from '../lib/types'
+import type { AnalysisResult, FeedbackSummary, KpiDetail, Persona } from '../lib/types'
 import { api } from '../lib/api'
 import { BreakdownChart } from './BreakdownChart'
 
@@ -33,6 +33,26 @@ function ConfidenceMeter({ value, reasoning }: { value: number; reasoning: strin
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
       <p className="text-xs text-[var(--text-muted)] mt-1.5">{reasoning}</p>
+    </div>
+  )
+}
+
+function ActualVsExpected({ result, unit }: { result: AnalysisResult; unit: string }) {
+  const deviating = Math.abs(result.expected_deviation_pct) >= 2
+  return (
+    <div className="rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-[var(--text-muted)]">Expected (trend-line forecast)</span>
+        <span className="font-semibold tabular">
+          {result.expected_value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          {unit}
+        </span>
+      </div>
+      <p className="text-xs mt-1" style={{ color: deviating ? 'var(--warning)' : 'var(--text-muted)' }}>
+        Actual is {result.expected_deviation_pct >= 0 ? '+' : ''}
+        {result.expected_deviation_pct.toFixed(1)}% vs. what the pre-window trend would have predicted
+        {deviating ? '' : ' — within normal forecast noise'}.
+      </p>
     </div>
   )
 }
@@ -118,18 +138,31 @@ function TelemetryFooter({ t }: { t: AnalysisResult['telemetry'] }) {
 
 function FeedbackWidget({ kpiId, persona }: { kpiId: string; persona: Persona }) {
   const [sent, setSent] = useState<'useful' | 'not_useful' | null>(null)
+  const [summary, setSummary] = useState<FeedbackSummary | null>(null)
 
   const send = async (useful: boolean) => {
     setSent(useful ? 'useful' : 'not_useful')
     try {
       await api.submitFeedback({ kpi_id: kpiId, persona, useful })
+      const s = await api.getFeedbackSummary(kpiId)
+      setSummary(s)
     } catch {
       /* feedback is best-effort telemetry, not critical path */
     }
   }
 
   if (sent) {
-    return <p className="text-xs text-[var(--text-muted)]">Thanks — feedback recorded for this analysis.</p>
+    return (
+      <div className="text-xs text-[var(--text-muted)]">
+        <p>Thanks — feedback recorded for this analysis.</p>
+        {summary && summary.total_feedback > 0 && (
+          <p className="mt-1">
+            {summary.useful_count} of {summary.total_feedback} analyses on this KPI marked useful (
+            {Math.round((summary.useful_rate ?? 0) * 100)}%). {summary.note}
+          </p>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -282,11 +315,20 @@ export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
 
           <p className="text-sm leading-relaxed">{result.narrative}</p>
 
+          <ActualVsExpected result={result} unit={kpi.unit} />
+
           <ConfidenceMeter value={result.confidence} reasoning={result.confidence_reasoning} />
 
           <MaterialityMeter m={result.materiality} />
 
           <DecisionAuthorityNote d={result.decision_authority} />
+
+          {result.cohort_benchmark && (
+            <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+              <span className="font-semibold text-[var(--text-primary)]">Cohort benchmark: </span>
+              {result.cohort_benchmark}
+            </div>
+          )}
 
           {result.known_drivers.length > 0 && (
             <div>

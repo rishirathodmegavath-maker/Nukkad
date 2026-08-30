@@ -85,6 +85,7 @@ def _make_kpi(
     access_roles: list[str],
     owner: str,
     known_drivers: list[str] | None = None,
+    cohort_benchmark: str | None = None,
 ) -> KPIDetail:
     dates = _dates(len(series))
     values = series.tolist()
@@ -127,6 +128,7 @@ def _make_kpi(
         access_roles=access_roles,
         owner=owner,
         known_drivers=known_drivers or [],
+        cohort_benchmark=cohort_benchmark,
     )
 
 
@@ -280,6 +282,12 @@ def _generate_all() -> dict[str, KPIDetail]:
             "Only 12 days of history available — no reliable trend baseline yet",
             "GA rollout still ramping in batches, not yet at steady state",
         ],
+        cohort_benchmark=(
+            "No reliable trend baseline exists for this feature itself yet, so it's compared against "
+            "a comparable-cohort proxy instead: the last 4 feature launches averaged 19.8% activation "
+            "at their Day-12 checkpoint. This feature (21.1%) is tracking in line with that cohort — "
+            "which is why confidence isn't at the absolute floor despite the short history."
+        ),
     )
 
     return kpis

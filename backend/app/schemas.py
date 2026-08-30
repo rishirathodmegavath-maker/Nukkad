@@ -54,6 +54,7 @@ class KPIDetail(KPISummary):
     calculation: str  # calculation / SQL-ish lineage description
     lineage: str  # source-to-metric data lineage
     known_drivers: list[str] = []  # simulated known/likely contributing factors, for multi-factor scenarios
+    cohort_benchmark: str | None = None  # comparable-cohort baseline, for sparse-history KPIs
 
 
 class KPIContract(BaseModel):
@@ -134,6 +135,9 @@ class AnalysisResult(BaseModel):
     recommended_actions: list[str]
     materiality: Materiality
     decision_authority: DecisionAuthority
+    expected_value: float  # simple trend-line forecast baseline ("what we'd expect")
+    expected_deviation_pct: float  # actual vs. expected_value, distinct from vs.-prior-period pct_change
+    cohort_benchmark: str | None = None
     narrative: str
     narrative_source: Literal["llm", "template"]
     processing_steps: list[ProcessingStep]
@@ -175,3 +179,16 @@ class FeedbackEntry(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class FeedbackSummary(BaseModel):
+    """Aggregated feedback for one KPI — the input a periodic recalibration
+    job would consume. This prototype computes and exposes the aggregate;
+    it does not yet feed it back into live confidence scoring."""
+
+    kpi_id: str
+    total_feedback: int
+    useful_count: int
+    not_useful_count: int
+    useful_rate: float | None
+    note: str
