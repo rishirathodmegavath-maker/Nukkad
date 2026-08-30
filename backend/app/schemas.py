@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 Status = Literal["normal", "watch", "critical", "recovered"]
+Persona = Literal["executive", "analyst", "ops_manager"]
 
 
 class TimeseriesPoint(BaseModel):
@@ -37,6 +38,9 @@ class KPISummary(BaseModel):
     pct_change: float
     status: Status
     sparkline: list[float]
+    source_system: str  # simulated upstream system(s) this KPI is reconciled from
+    refresh_cadence: str  # e.g. "real-time (streaming)", "hourly batch", "daily batch", "weekly batch"
+    access_roles: list[str]  # roles entitled to view this KPI (row/domain-level access control)
 
 
 class KPIDetail(KPISummary):
@@ -45,15 +49,59 @@ class KPIDetail(KPISummary):
     evidence: list[EvidenceItem]
     data_completeness: float  # 0-1, drives confidence
     dimension_label: str
+    definition: str  # plain-language KPI definition (semantic contract)
+    calculation: str  # calculation / SQL-ish lineage description
+    lineage: str  # source-to-metric data lineage
+    known_drivers: list[str] = []  # simulated known/likely contributing factors, for multi-factor scenarios
+
+
+class KPIContract(BaseModel):
+    """Lightweight KPI / semantic contract: definition, calculation, drivers,
+    thresholds, lineage and access restrictions — governed metadata a BI
+    platform would keep so every downstream consumer agrees on what the
+    number means."""
+
+    kpi_id: str
+    name: str
+    unit: str
+    definition: str
+    calculation: str
+    dimension_label: str
+    drivers: list[str]
+    thresholds: dict[str, str]
+    source_system: str
+    refresh_cadence: str
+    lineage: str
+    access_roles: list[str]
+    history_days: int
+
+
+class ProcessingStep(BaseModel):
+    step: str
+    method: str  # "deterministic" | "llm" | "retrieval"
+    detail: str
+
+
+class Telemetry(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
+    total_latency_ms: float
+    llm_latency_ms: float
+    model_calls: int
+    input_tokens: int
+    output_tokens: int
+    estimated_cost_usd: float
 
 
 class AnalysisResult(BaseModel):
     kpi_id: str
     generated_at: str
+    persona: Persona
     what_changed: str
     likely_cause: str
     evidence: list[EvidenceItem]
     contributing_factors: list[BreakdownItem]
+    known_drivers: list[str]
     significance: Literal["noise", "meaningful", "severe"]
     confidence: float  # 0-1
     confidence_reasoning: str
@@ -61,17 +109,42 @@ class AnalysisResult(BaseModel):
     recommended_actions: list[str]
     narrative: str
     narrative_source: Literal["llm", "template"]
+    processing_steps: list[ProcessingStep]
+    telemetry: Telemetry
 
 
 class AuditLogEntry(BaseModel):
+    model_config = {"protected_namespaces": (), "from_attributes": True}
+
     id: int
     timestamp: str
     kpi_id: str
     kpi_name: str
     action: str
+    persona: str
+    role: str
     confidence: float
     narrative_source: str
+    total_latency_ms: float
+    model_calls: int
+    estimated_cost_usd: float
     summary: str
+
+
+class FeedbackCreate(BaseModel):
+    kpi_id: str
+    persona: Persona = "executive"
+    useful: bool
+    comment: str | None = None
+
+
+class FeedbackEntry(BaseModel):
+    id: int
+    timestamp: str
+    kpi_id: str
+    persona: str
+    useful: bool
+    comment: str | None
 
     class Config:
         from_attributes = True

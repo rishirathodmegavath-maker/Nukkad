@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { KpiSummary } from '../lib/types'
 import { KpiCard } from '../components/KpiCard'
+import { useRole } from '../lib/roleContext'
 
 function Hero() {
   return (
@@ -26,8 +27,8 @@ function Hero() {
         <div>
           <p className="font-semibold text-[var(--text-primary)]">What Clarity does</p>
           <p className="text-[var(--text-secondary)] mt-1">
-            It runs anomaly detection, ranks contributing segments, pulls corroborating evidence, and
-            writes an executive-ready explanation with a confidence score — in seconds.
+            It reconciles KPIs across heterogeneous sources, ranks contributing segments, pulls corroborating
+            evidence, and writes a persona-specific, confidence-scored explanation — in seconds.
           </p>
         </div>
         <div>
@@ -43,15 +44,18 @@ function Hero() {
 }
 
 export function Dashboard() {
+  const { role } = useRole()
   const [kpis, setKpis] = useState<KpiSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setKpis(null)
+    setError(null)
     api
-      .listKpis()
+      .listKpis(role)
       .then(setKpis)
       .catch((e) => setError(e.message))
-  }, [])
+  }, [role])
 
   return (
     <div>
@@ -61,7 +65,11 @@ export function Dashboard() {
         <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
           Monitored KPIs
         </h2>
-        {kpis && <span className="text-xs text-[var(--text-muted)]">{kpis.length} metrics · updated live</span>}
+        {kpis && (
+          <span className="text-xs text-[var(--text-muted)]">
+            {kpis.length} metric{kpis.length === 1 ? '' : 's'} visible to this role
+          </span>
+        )}
       </div>
 
       {error && (
@@ -78,7 +86,14 @@ export function Dashboard() {
         </div>
       )}
 
-      {kpis && (
+      {kpis && kpis.length === 0 && (
+        <div className="rounded-xl border p-8 text-center text-sm text-[var(--text-muted)]" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+          No KPIs are entitled to this role. Switch "Viewing as" in the top bar to see a different scope —
+          this is the row/domain-level access control demo, not an empty state bug.
+        </div>
+      )}
+
+      {kpis && kpis.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {kpis.map((kpi) => (
             <KpiCard key={kpi.id} kpi={kpi} />

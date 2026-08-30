@@ -43,8 +43,12 @@ export function AuditLog() {
                 <th className="px-4 py-2.5 font-medium">Time</th>
                 <th className="px-4 py-2.5 font-medium">KPI</th>
                 <th className="px-4 py-2.5 font-medium">Summary</th>
+                <th className="px-4 py-2.5 font-medium">Persona</th>
+                <th className="px-4 py-2.5 font-medium">Role</th>
                 <th className="px-4 py-2.5 font-medium">Confidence</th>
                 <th className="px-4 py-2.5 font-medium">Source</th>
+                <th className="px-4 py-2.5 font-medium">Latency</th>
+                <th className="px-4 py-2.5 font-medium">Est. cost</th>
               </tr>
             </thead>
             <tbody>
@@ -55,6 +59,8 @@ export function AuditLog() {
                   </td>
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{e.kpi_name}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{e.summary}</td>
+                  <td className="px-4 py-3 text-xs text-[var(--text-secondary)] whitespace-nowrap">{e.persona}</td>
+                  <td className="px-4 py-3 text-xs text-[var(--text-secondary)] whitespace-nowrap">{e.role}</td>
                   <td className="px-4 py-3 tabular">{Math.round(e.confidence * 100)}%</td>
                   <td className="px-4 py-3">
                     <span
@@ -66,6 +72,10 @@ export function AuditLog() {
                     >
                       {e.narrative_source}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs tabular text-[var(--text-muted)] whitespace-nowrap">{e.total_latency_ms.toFixed(1)}ms</td>
+                  <td className="px-4 py-3 text-xs tabular text-[var(--text-muted)] whitespace-nowrap">
+                    {e.model_calls > 0 ? `$${e.estimated_cost_usd.toFixed(6)}` : '—'}
                   </td>
                 </tr>
               ))}

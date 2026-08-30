@@ -8,12 +8,16 @@ from __future__ import annotations
 SIGNIFICANCE_BASE = {"severe": 0.88, "meaningful": 0.68, "noise": 0.35}
 
 
+SPARSE_HISTORY_THRESHOLD_DAYS = 30
+
+
 def score_confidence(
     significance: str,
     data_completeness: float,
     has_primary_driver: bool,
     top_contribution_pct: float,
     evidence_count: int,
+    history_days: int = 90,
 ) -> tuple[float, str]:
     base = SIGNIFICANCE_BASE[significance]
     reasons = [f"statistical signal is '{significance}' (base {base:.2f})"]
@@ -33,6 +37,13 @@ def score_confidence(
         reasons.append(f"{evidence_count} corroborating evidence item(s) found")
     else:
         reasons.append("no corroborating qualitative evidence found")
+
+    if history_days < SPARSE_HISTORY_THRESHOLD_DAYS:
+        score = min(score, 0.45) * (0.5 + 0.5 * history_days / SPARSE_HISTORY_THRESHOLD_DAYS)
+        reasons.append(
+            f"only {history_days} day(s) of history available — insufficient for a reliable trend "
+            "baseline, so confidence is deliberately capped regardless of the raw signal"
+        )
 
     score = max(0.05, min(0.98, score))
     reasoning = "; ".join(reasons) + "."

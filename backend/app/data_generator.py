@@ -1,8 +1,15 @@
-"""Synthetic-but-deliberate demo data. Five KPIs, five distinct storylines
+"""Synthetic-but-deliberate demo data. Six KPIs, six distinct storylines
 (normal / critical anomaly / gradual high-risk trend / recovered after
-intervention / genuinely ambiguous), so the product demonstrates its full
-range rather than one lucky scenario. Generated once at import time with
-fixed RNG seeds so every run of the demo is stable and reproducible.
+intervention / genuinely ambiguous / sparse-history new launch), so the
+product demonstrates its full range rather than one lucky scenario.
+Generated once at import time with fixed RNG seeds so every run of the demo
+is stable and reproducible.
+
+Each KPI also carries simulated multi-source lineage (source_system,
+refresh_cadence), a lightweight semantic contract (definition, calculation,
+lineage), and access_roles for the row/domain-level access-control demo —
+these are the "governed KPI semantics" and "heterogeneous sources" the
+Round 2 brief asks for, kept intentionally simple for a single-hour prototype.
 """
 from __future__ import annotations
 
@@ -17,17 +24,17 @@ DAYS = 90
 TODAY = date.today()
 
 
-def _dates() -> list[date]:
-    return [TODAY - timedelta(days=(DAYS - 1 - i)) for i in range(DAYS)]
+def _dates(n: int = DAYS) -> list[date]:
+    return [TODAY - timedelta(days=(n - 1 - i)) for i in range(n)]
 
 
-def _base_series(mean: float, noise_pct: float, seed: int, weekly_season_pct: float = 0.0) -> np.ndarray:
+def _base_series(mean: float, noise_pct: float, seed: int, weekly_season_pct: float = 0.0, days: int = DAYS) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    noise = rng.normal(0, mean * noise_pct, DAYS)
-    season = np.zeros(DAYS)
+    noise = rng.normal(0, mean * noise_pct, days)
+    season = np.zeros(days)
     if weekly_season_pct:
-        for i in range(DAYS):
-            dow = (TODAY - timedelta(days=(DAYS - 1 - i))).weekday()
+        for i in range(days):
+            dow = (TODAY - timedelta(days=(days - 1 - i))).weekday()
             season[i] = mean * weekly_season_pct * (1 if dow < 5 else -1)
     return mean + noise + season
 
@@ -70,8 +77,15 @@ def _make_kpi(
     contributions: dict[str, float],
     evidence: list[EvidenceItem],
     data_completeness: float,
+    source_system: str,
+    refresh_cadence: str,
+    definition: str,
+    calculation: str,
+    lineage: str,
+    access_roles: list[str],
+    known_drivers: list[str] | None = None,
 ) -> KPIDetail:
-    dates = _dates()
+    dates = _dates(len(series))
     values = series.tolist()
     anomaly_flags = rolling_anomaly_flags(values)
     significance, pct_change, _trend = classify_significance(values)
@@ -79,7 +93,7 @@ def _make_kpi(
     status = determine_status(significance, pct_change, higher_is_better, recovered)
 
     current_value = float(np.mean(values[-3:]))
-    prior_value = float(np.mean(values[-17:-7]))
+    prior_value = float(np.mean(values[-17:-7])) if len(values) >= 17 else float(np.mean(values[: max(1, len(values) - 3)]))
     total_change = current_value - prior_value
 
     breakdown = _build_breakdown(dimension_label, shares, contributions, prior_value, total_change)
@@ -104,6 +118,13 @@ def _make_kpi(
         evidence=evidence,
         data_completeness=data_completeness,
         dimension_label=dimension_label,
+        source_system=source_system,
+        refresh_cadence=refresh_cadence,
+        definition=definition,
+        calculation=calculation,
+        lineage=lineage,
+        access_roles=access_roles,
+        known_drivers=known_drivers or [],
     )
 
 
@@ -124,6 +145,13 @@ def _generate_all() -> dict[str, KPIDetail]:
             EvidenceItem(source="Support tickets", text="No increase in churn-related tickets from Online/Retail customers this period.", relevance="contextual"),
         ],
         data_completeness=0.93,
+        source_system="Billing Platform (Stripe) + Salesforce CRM",
+        refresh_cadence="daily batch",
+        definition="Total recognized revenue for the APAC region across all sales channels, in $K/day.",
+        calculation="SUM(invoice_amount) WHERE region='APAC', reconciled daily against Salesforce opportunity close events.",
+        lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, joined to Salesforce account/channel dims.",
+        access_roles=["global_exec", "apac_manager", "analyst"],
+        known_drivers=["Single dominant driver: Enterprise segment account churn (TitanCorp cancellation)"],
     )
 
     # 2. NORMAL: stable, low-noise series with no shock or trend.
@@ -140,9 +168,18 @@ def _generate_all() -> dict[str, KPIDetail]:
             EvidenceItem(source="Marketing calendar", text="No major campaigns launched or ended in this window.", relevance="contextual"),
         ],
         data_completeness=0.97,
+        source_system="Order Management System (event stream)",
+        refresh_cadence="real-time (streaming)",
+        definition="Count of completed NA online orders per day, across all devices.",
+        calculation="COUNT(DISTINCT order_id) WHERE market='NA' AND channel='online', streamed and rolled up to daily grain.",
+        lineage="OMS Kafka topic -> stream aggregator -> orders_daily materialized view.",
+        access_roles=["global_exec", "na_manager", "analyst"],
     )
 
-    # 3. WATCH: slow gradual decline across the whole window, broad-based
+    # 3. WATCH: slow gradual decline across the whole window, broad-based.
+    # Deliberately tagged as the multi-factor scenario: a technical driver
+    # (checkout latency) overlays a broad-based channel decline — two
+    # different kinds of "cause" acting at once, not a single isolated one.
     rng = np.random.default_rng(3)
     trend = np.linspace(3.8, 3.2, DAYS)
     s = trend + rng.normal(0, 0.05, DAYS)
@@ -155,6 +192,16 @@ def _generate_all() -> dict[str, KPIDetail]:
             EvidenceItem(source="Support tickets", text="Small uptick in 'payment step failed' complaints, not isolated to one channel.", relevance="supporting"),
         ],
         data_completeness=0.88,
+        source_system="Product Analytics (Amplitude) + Web Server Logs",
+        refresh_cadence="hourly batch",
+        definition="Share of EMEA site sessions that complete checkout, in %/day.",
+        calculation="COUNT(sessions with completed order) / COUNT(sessions) WHERE region='EMEA', aggregated hourly then rolled to daily.",
+        lineage="Amplitude events + nginx access logs -> hourly Spark job -> conversion_hourly -> daily rollup.",
+        access_roles=["global_exec", "emea_manager", "analyst"],
+        known_drivers=[
+            "Checkout latency regression (+600ms) affecting all traffic sources equally",
+            "Broad-based decline across channels — no single traffic-source outlier",
+        ],
     )
 
     # 4. RECOVERED: dip then recovery after an intervention
@@ -171,6 +218,13 @@ def _generate_all() -> dict[str, KPIDetail]:
             EvidenceItem(source="Ops incident log", text="Gateway failover fix deployed; checkout success rate back to baseline since.", relevance="supporting"),
         ],
         data_completeness=0.95,
+        source_system="Billing Platform (Stripe) + Ops Incident Log (PagerDuty)",
+        refresh_cadence="daily batch",
+        definition="Total recognized revenue for the LATAM region across all sales channels, in $K/day.",
+        calculation="SUM(invoice_amount) WHERE region='LATAM', reconciled daily against PagerDuty incident windows.",
+        lineage="Stripe invoices -> nightly finance ETL -> revenue_daily fact table, annotated with PagerDuty incident overlays.",
+        access_roles=["global_exec", "latam_manager", "analyst"],
+        known_drivers=["Payment gateway outage (13 days) — resolved, recovery attributable to the fix"],
     )
 
     # 5. AMBIGUOUS: noisy, broad-based increase in a "lower is better" metric, low data completeness
@@ -185,6 +239,39 @@ def _generate_all() -> dict[str, KPIDetail]:
             EvidenceItem(source="Support tickets", text="No dominant complaint theme identified across cancellation surveys this period.", relevance="contextual"),
         ],
         data_completeness=0.55,
+        source_system="CRM (Salesforce) + Support Tickets (Zendesk)",
+        refresh_cadence="weekly batch",
+        definition="Share of global SMB accounts that cancel in a given period, in %/week, by tenure cohort.",
+        calculation="COUNT(cancelled accounts) / COUNT(active accounts at period start), grouped by tenure cohort.",
+        lineage="Salesforce account status + Zendesk cancellation surveys -> weekly batch join -> churn_weekly.",
+        access_roles=["global_exec", "analyst"],
+    )
+
+    # 6. SPARSE-HISTORY: newly launched feature, only 12 days of data — not
+    # enough to establish a reliable trend baseline. Confidence must reflect
+    # that honestly rather than pretending 90 days of history exist.
+    sparse_days = 12
+    rng = np.random.default_rng(6)
+    trend6 = np.linspace(18.0, 21.5, sparse_days)
+    s6 = trend6 + rng.normal(0, 0.8, sparse_days)
+    kpis["activation_ai_copilot"] = _make_kpi(
+        "activation_ai_copilot", "Activation Rate — AI Copilot (New Feature)", "%", "Growth", True, s6, "cohort",
+        shares={"Beta users": 0.60, "GA rollout": 0.40},
+        contributions={"Beta users": 58, "GA rollout": 42},
+        evidence=[
+            EvidenceItem(source="Product analytics", text="Feature launched 12 days ago; GA rollout is still ramping in batches.", relevance="contextual"),
+        ],
+        data_completeness=0.35,
+        source_system="Product Analytics (Amplitude)",
+        refresh_cadence="daily batch",
+        definition="Share of exposed users who complete a first meaningful action with the AI Copilot within 7 days of exposure.",
+        calculation="COUNT(users with >=1 copilot action in 7d) / COUNT(users exposed to copilot), grouped daily.",
+        lineage="Amplitude event stream -> nightly ETL -> activation_daily table (feature launched 12 days ago).",
+        access_roles=["global_exec", "product_lead", "analyst"],
+        known_drivers=[
+            "Only 12 days of history available — no reliable trend baseline yet",
+            "GA rollout still ramping in batches, not yet at steady state",
+        ],
     )
 
     return kpis

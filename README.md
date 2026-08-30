@@ -1,7 +1,15 @@
 # Clarity — AI KPI Storytelling Engine
 
-**Accenture Innovation Challenge 2026 — Round 1 prototype**
-Problem statement: **BusinessIntelligence.ai**
+**Accenture Innovation Challenge 2026 — Round 2 prototype**
+Problem statement: **BusinessIntelligence.ai** (Track 3)
+
+> Round 2 extends the Round 1 prototype into a KPI **intelligence-to-action
+> engine**: multi-source/multi-cadence KPIs, a governed semantic contract,
+> persona-specific narratives, an explicit sparse-history scenario, row/domain
+> -level access control, a transparent LLM-vs-deterministic breakdown, real
+> runtime telemetry (latency/tokens/cost), and a feedback-capture loop. See
+> [§14 Round 2 requirements mapping](#14-round-2-requirements-mapping) for the
+> full checklist against the brief.
 
 > A dashboard can show revenue dropped 8%; it rarely explains why or what to do
 > next. Clarity turns that gap into a button: click "Explain this KPI" and get
@@ -174,23 +182,38 @@ read only on the backend.
 4. Click any KPI card → click **"Explain this KPI"**
 5. Check **Audit Log** in the top nav to see the run logged
 
-## 11. Demo workflow (5 scenarios, deliberately curated)
+## 11. Demo workflow (6 scenarios, deliberately curated)
 
 | KPI | Status | What it demonstrates |
 |---|---|---|
 | Revenue — APAC | **Critical** | Sudden anomaly, one dominant root cause (enterprise account churn), high confidence |
 | Orders — NA Online | **Normal** | Stable metric, nothing to explain — the system doesn't cry wolf |
-| Conversion Rate — EMEA | **Watch** | Slow gradual decline (not a shock) with a broad-based cause across channels |
+| Conversion Rate — EMEA | **Watch** | Slow gradual decline with **two overlapping factors** (a checkout-latency regression + a broad-based channel decline) — the multi-factor scenario |
 | Revenue — LATAM | **Recovered** | Dip caused by an incident, then a successful intervention — the system recognizes and documents the recovery |
-| Churn Rate — Global SMB | **Ambiguous** | Weak, noisy signal with low data completeness — the system explicitly declines to name a dominant cause and lowers its confidence (21%) instead of guessing |
+| Churn Rate — Global SMB | **Ambiguous** | Weak, noisy signal with low data completeness — the system explicitly declines to name a dominant cause and lowers its confidence instead of guessing |
+| Activation Rate — AI Copilot | **Sparse-history** | Feature launched 12 days ago — confidence is explicitly capped because there isn't enough history for a reliable baseline, not because the signal itself is weak |
+
+Two more scenarios live in the access layer rather than the data: ask for any
+KPI with a role that isn't entitled to it (e.g. `role=latam_manager` on
+`rev_apac`) to see the row/domain-level **security scenario** (403, not a
+silent empty result); switch personas on the same analysis to see the
+**role-based personalization** scenario (executive vs. analyst vs. ops
+manager get different narratives from identical underlying facts).
 
 ## 12. Test instructions
 
 Backend:
 ```bash
 curl http://localhost:8000/api/health
-curl http://localhost:8000/api/kpis
-curl -X POST http://localhost:8000/api/kpis/rev_apac/analyze
+curl http://localhost:8000/api/roles
+curl "http://localhost:8000/api/kpis?role=global_exec"
+curl "http://localhost:8000/api/kpis/conv_emea/contract"                 # semantic contract
+curl -X POST "http://localhost:8000/api/kpis/rev_apac/analyze?persona=executive&role=global_exec"
+curl -X POST "http://localhost:8000/api/kpis/rev_apac/analyze?persona=analyst&role=global_exec"
+curl -X POST "http://localhost:8000/api/kpis/activation_ai_copilot/analyze?persona=analyst&role=analyst"  # sparse-history
+curl -i "http://localhost:8000/api/kpis/rev_apac?role=latam_manager"     # expect 403 — RBAC scenario
+curl -X POST "http://localhost:8000/api/feedback" -H "Content-Type: application/json" \
+  -d '{"kpi_id":"rev_apac","persona":"executive","useful":true}'
 curl http://localhost:8000/api/audit-log
 ```
 
@@ -201,9 +224,13 @@ npx tsc --noEmit
 npm run build
 ```
 
-This was verified end-to-end with a headless-browser pass (navigation,
-analysis run, audit log entry) with zero console errors before this README
-was written.
+Round 1 was verified end-to-end with a headless-browser pass. The Round 2
+additions above were verified via: `tsc --noEmit` + `npm run build` (clean),
+and live `curl` runs of every new endpoint (RBAC 403s, contract, persona
+narratives, sparse-history confidence capping, feedback capture) against a
+running `uvicorn` instance. A full browser click-through of the new UI
+(persona selector, role switcher, contract viewer, feedback buttons) has not
+yet been done — do that before final submission.
 
 ## 13. Limitations
 
@@ -218,7 +245,32 @@ was written.
 - No authentication — not needed for a single-tenant demo prototype
 - LLM narrative mode calls a live API per request with no caching
 
-## 14. Future roadmap
+## 14. Round 2 requirements mapping
+
+Mapped against the BusinessIntelligence.ai Round 2 "Minimum Prototype
+Expectations." Built in a focused single push on top of the Round 1 engine —
+scoped honestly rather than padded; gaps are listed as gaps, not glossed over.
+
+| Requirement | Status | Where |
+|---|---|---|
+| 3-5 connected KPIs across 2-3 sources with different grains/cadences | ✅ | 6 KPIs across 5 simulated source systems (Stripe+Salesforce, OMS stream, Amplitude+logs, PagerDuty) and 4 cadences (real-time streaming, hourly, daily, weekly batch) — `data_generator.py` |
+| Lightweight KPI/semantic contract (definition, calculation, drivers, thresholds, lineage, access) | ✅ | `GET /api/kpis/{id}/contract` — `routers/kpis.py`, `schemas.KPIContract` |
+| ≥2 personas with different narratives/actions | ✅ | `executive` / `analyst` / `ops_manager`, prompt- and template-branched — `analysis/narrative.py` |
+| One multi-factor KPI movement with known/simulated drivers | ✅ | Conversion Rate — EMEA: checkout-latency regression *and* broad-based channel decline, tagged in `known_drivers` |
+| One low-confidence / abstention scenario | ✅ | Churn Rate — Global SMB: no dominant segment, confidence lowered, action defaults to "assign an analyst" rather than naming a cause |
+| One sparse-history / newly-launched KPI scenario | ✅ | Activation Rate — AI Copilot: 12 days of history, confidence explicitly capped in `analysis/confidence.py` regardless of raw signal strength |
+| One role-based security/entitlement scenario | ✅ | `access_roles` per KPI, enforced server-side (403, not client-side hiding) in `routers/kpis.py` + `routers/analysis.py`; role switcher in the UI header |
+| Evidence with source freshness, method, contribution, confidence, lineage | ✅ | Evidence panel + confidence reasoning string + contract's `lineage`/`refresh_cadence` fields |
+| Clear LLM vs. non-LLM breakdown | ✅ | `processing_steps` on every `AnalysisResult`, rendered in the UI — every stage tagged `deterministic`, `retrieval`, or `llm` |
+| Runtime telemetry (latency, model calls, tokens, cost) | ✅ | Real (not estimated) token counts read from the Anthropic API `usage` block when an LLM call is made; latency measured end-to-end; persisted per-run in the audit log |
+| Mechanism to learn from feedback | 🟡 partial | `POST/GET /api/feedback` captures useful/not-useful + comment per analysis — the capture loop is real; automated recalibration from that feedback is not built (documented as a roadmap item, not claimed) |
+| Materiality = statistical significance **and** business impact | 🟡 partial | Statistical significance (z-score + trend) is fully automated; $ business-impact sizing is left as an analyst action step ("quantify revenue-at-risk") rather than an automated second signal |
+| Row/column/domain-level security | 🟡 partial | Row/domain-level (per-KPI role gating) implemented and enforced server-side; column-level (field-level redaction) is not — noted as a gap, not a hidden one |
+| Multi-dimensional root-cause search (interaction effects) | ❌ not built | Attribution is still single-dimension per KPI (channel *or* region, not channel × region) — unchanged from Round 1, listed below |
+| Real data connectors (warehouse/BI tool) | ❌ not built | All data is seeded/synthetic by design, per the brief's own "not expected to have real proprietary data" allowance |
+| RAG over a real evidence corpus | ❌ not built | Evidence retrieval is a curated lookup, not vector retrieval over a live corpus |
+
+## 15. Future roadmap
 
 - Seasonality-aware anomaly detection (STL decomposition)
 - Multi-dimensional root-cause search (interaction effects across region ×

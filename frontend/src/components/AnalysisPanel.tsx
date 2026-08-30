@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AnalysisResult, KpiDetail } from '../lib/types'
+import type { AnalysisResult, KpiDetail, Persona } from '../lib/types'
 import { api } from '../lib/api'
 import { BreakdownChart } from './BreakdownChart'
 
@@ -10,6 +10,12 @@ const PIPELINE_STEPS = [
   'Retrieving corroborating evidence',
   'Scoring confidence',
   'Generating explanation',
+]
+
+const PERSONAS: { id: Persona; label: string }[] = [
+  { id: 'executive', label: 'Executive' },
+  { id: 'analyst', label: 'Analyst' },
+  { id: 'ops_manager', label: 'Ops Manager' },
 ]
 
 function ConfidenceMeter({ value, reasoning }: { value: number; reasoning: string }) {
@@ -31,7 +37,88 @@ function ConfidenceMeter({ value, reasoning }: { value: number; reasoning: strin
   )
 }
 
-export function AnalysisPanel({ kpi }: { kpi: KpiDetail }) {
+function ProcessingBreakdown({ steps }: { steps: AnalysisResult['processing_steps'] }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">
+        LLM vs. deterministic breakdown
+      </p>
+      <ul className="space-y-1.5">
+        {steps.map((s, i) => (
+          <li key={i} className="text-xs flex items-start gap-2">
+            <span
+              className="shrink-0 rounded-full px-1.5 py-0.5 font-medium"
+              style={{
+                color: s.method === 'llm' ? 'var(--brand)' : 'var(--text-secondary)',
+                background: s.method === 'llm' ? 'var(--brand-bg)' : 'var(--border)',
+              }}
+            >
+              {s.method}
+            </span>
+            <span className="text-[var(--text-secondary)]">
+              <span className="font-medium text-[var(--text-primary)]">{s.step}</span> — {s.detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function TelemetryFooter({ t }: { t: AnalysisResult['telemetry'] }) {
+  return (
+    <div className="text-[10px] text-[var(--text-muted)] flex flex-wrap gap-x-3 gap-y-1 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+      <span>latency {t.total_latency_ms.toFixed(1)}ms</span>
+      <span>model calls {t.model_calls}</span>
+      {t.model_calls > 0 && (
+        <>
+          <span>tokens {t.input_tokens}→{t.output_tokens}</span>
+          <span>est. cost ${t.estimated_cost_usd.toFixed(6)}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+function FeedbackWidget({ kpiId, persona }: { kpiId: string; persona: Persona }) {
+  const [sent, setSent] = useState<'useful' | 'not_useful' | null>(null)
+
+  const send = async (useful: boolean) => {
+    setSent(useful ? 'useful' : 'not_useful')
+    try {
+      await api.submitFeedback({ kpi_id: kpiId, persona, useful })
+    } catch {
+      /* feedback is best-effort telemetry, not critical path */
+    }
+  }
+
+  if (sent) {
+    return <p className="text-xs text-[var(--text-muted)]">Thanks — feedback recorded for this analysis.</p>
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-[var(--text-muted)]">Was this explanation useful?</span>
+      <button
+        onClick={() => send(true)}
+        className="rounded-md border px-2 py-1 hover:bg-[var(--border)]"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        👍 Yes
+      </button>
+      <button
+        onClick={() => send(false)}
+        className="rounded-md border px-2 py-1 hover:bg-[var(--border)]"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        👎 No
+      </button>
+    </div>
+  )
+}
+
+export function AnalysisPanel({ kpi, role }: { kpi: KpiDetail; role: string }) {
+  const [persona, setPersona] = useState<Persona>('executive')
   const [phase, setPhase] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [activeStep, setActiveStep] = useState(0)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -42,7 +129,7 @@ export function AnalysisPanel({ kpi }: { kpi: KpiDetail }) {
     setActiveStep(0)
     setError(null)
 
-    const resultPromise = api.analyzeKpi(kpi.id)
+    const resultPromise = api.analyzeKpi(kpi.id, persona, role)
     const stepTimer = new Promise<void>((resolve) => {
       let i = 0
       const interval = setInterval(() => {
@@ -83,11 +170,29 @@ export function AnalysisPanel({ kpi }: { kpi: KpiDetail }) {
         )}
       </div>
 
+      {phase !== 'running' && (
+        <div className="flex items-center gap-1.5 my-3">
+          {PERSONAS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPersona(p.id)}
+              className="text-xs rounded-full px-2.5 py-1 font-medium transition-colors"
+              style={{
+                background: persona === p.id ? 'var(--brand)' : 'var(--border)',
+                color: persona === p.id ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {phase === 'idle' && (
         <div className="py-6 text-center">
           <p className="text-sm text-[var(--text-secondary)] mb-4 max-w-sm mx-auto">
             Run the full pipeline: anomaly detection → root-cause attribution → evidence retrieval → confidence
-            scoring → natural-language explanation.
+            scoring → {persona.replace('_', ' ')}-tuned explanation.
           </p>
           <button
             onClick={run}
@@ -143,6 +248,19 @@ export function AnalysisPanel({ kpi }: { kpi: KpiDetail }) {
 
           <ConfidenceMeter value={result.confidence} reasoning={result.confidence_reasoning} />
 
+          {result.known_drivers.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">
+                Known / simulated drivers
+              </p>
+              <ul className="space-y-1 text-xs text-[var(--text-secondary)]">
+                {result.known_drivers.map((d, i) => (
+                  <li key={i}>• {d}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">
               Contributing factors ({kpi.dimension_label})
@@ -173,6 +291,12 @@ export function AnalysisPanel({ kpi }: { kpi: KpiDetail }) {
               ))}
             </ul>
           </div>
+
+          <ProcessingBreakdown steps={result.processing_steps} />
+
+          <FeedbackWidget kpiId={kpi.id} persona={persona} />
+
+          <TelemetryFooter t={result.telemetry} />
 
           <button
             onClick={run}

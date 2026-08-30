@@ -36,6 +36,10 @@ export function KpiCard({ kpi }: { kpi: KpiSummary }) {
           <Sparkline data={kpi.sparkline} color={statusColor(kpi.status)} />
         </div>
       </div>
+
+      <p className="text-[10px] text-[var(--text-muted)] mt-3 truncate" title={`${kpi.source_system} · ${kpi.refresh_cadence}`}>
+        {kpi.source_system} · {kpi.refresh_cadence}
+      </p>
     </Link>
   )
 }

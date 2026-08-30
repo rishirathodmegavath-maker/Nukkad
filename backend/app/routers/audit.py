@@ -19,8 +19,13 @@ def get_audit_log(limit: int = 50, db: Session = Depends(get_db)):
             kpi_id=r.kpi_id,
             kpi_name=r.kpi_name,
             action=r.action,
+            persona=r.persona or "executive",
+            role=r.role or "global_exec",
             confidence=r.confidence,
             narrative_source=r.narrative_source,
+            total_latency_ms=r.total_latency_ms or 0.0,
+            model_calls=r.model_calls or 0,
+            estimated_cost_usd=r.estimated_cost_usd or 0.0,
             summary=r.summary,
         )
         for r in rows
